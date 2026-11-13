@@ -63,16 +63,16 @@ fun SheildlenzBackdrop(
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFFCFEFF),
+                            Color(0xFFFFFFFF),
                             AegisVoidBackground,
-                            Color(0xFFEAF2FF)
+                            Color(0xFFEEF4FF)
                         )
                     )
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisElectricBlue.copy(alpha = 0.09f),
+                            AegisElectricBlue.copy(alpha = 0.08f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.85f, size.height * 0.08f),
@@ -84,7 +84,7 @@ fun SheildlenzBackdrop(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisOpticalTeal.copy(alpha = 0.08f),
+                            AegisPrimaryCyan.copy(alpha = 0.06f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.12f, size.height * 0.36f),
@@ -96,7 +96,7 @@ fun SheildlenzBackdrop(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisChampagneGold.copy(alpha = 0.08f),
+                            AegisChampagneGold.copy(alpha = 0.09f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.78f, size.height * 0.88f),

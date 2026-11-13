@@ -212,7 +212,7 @@ fun AegisShieldGraphic(
                     width * (0.50f - 0.30f * p)
                 }
                 val waveAlpha = (1f - p) * 0.65f
-                val waveColor = if (waveDirection > 0) AegisSuccessGreen else AegisTextMuted
+                val waveColor = if (waveDirection > 0) AegisPrimaryCyan else AegisTextMuted
                 drawCircle(
                     color = waveColor.copy(alpha = waveAlpha),
                     radius = waveRadius,

@@ -212,18 +212,18 @@ class SystemOverlayController(private val context: Context) {
 
         val badge = TextView(context).apply {
             text = "SHEILDLENZ • FULL DEVICE LOCKDOWN"
-            setTextColor(Color.parseColor("#B87614"))
+            setTextColor(Color.parseColor("#D99B26"))
             textSize = 11f
             typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
-            background = roundedBox("#FFF8E8", "#E8C374", 50f)
+            background = roundedBox("#FFF8E7", "#E8C374", 50f)
             setPadding(36, 14, 36, 14)
         }
         root.addView(badge)
 
         val title = TextView(context).apply {
             text = "Device Locked for Safety"
-            setTextColor(Color.parseColor("#1E408A"))
+            setTextColor(Color.parseColor("#1E4494"))
             textSize = 26f
             typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -233,7 +233,7 @@ class SystemOverlayController(private val context: Context) {
 
         val subTitle = TextView(context).apply {
             text = "Inappropriate visual content was detected and blocked automatically."
-            setTextColor(Color.parseColor("#4B6BA3"))
+            setTextColor(Color.parseColor("#5272B3"))
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 24)
@@ -254,7 +254,7 @@ class SystemOverlayController(private val context: Context) {
 
         countdownTitleView = TextView(context).apply {
             text = "REMAINING LOCKDOWN PENALTY"
-            setTextColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.parseColor("#2B6CE6"))
             textSize = 11f
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -263,7 +263,7 @@ class SystemOverlayController(private val context: Context) {
 
         countdownClockView = TextView(context).apply {
             text = "10:00:00"
-            setTextColor(Color.parseColor("#B87614"))
+            setTextColor(Color.parseColor("#D99B26"))
             textSize = 38f
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -273,7 +273,7 @@ class SystemOverlayController(private val context: Context) {
 
         unlockHintView = TextView(context).apply {
             text = "Guardian password prompt unlocks after countdown completes."
-            setTextColor(Color.parseColor("#6B86B8"))
+            setTextColor(Color.parseColor("#728FC7"))
             textSize = 12f
             gravity = Gravity.CENTER
         }
@@ -302,7 +302,7 @@ class SystemOverlayController(private val context: Context) {
 
         val forensicsHeading = TextView(context).apply {
             text = "INCIDENT FORENSICS — WHAT WAS DETECTED"
-            setTextColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.parseColor("#2B6CE6"))
             textSize = 11f
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             setPadding(0, 0, 0, 12)
@@ -320,7 +320,7 @@ class SystemOverlayController(private val context: Context) {
                 val doubleLabel = AegisPreferences.formatMinutesLabel(prefs.getDoubleTimeDurationMinutes())
                 append("• Actions Taken: Offending app closed & Recents guard armed, background process stopped, $stage1Label lock (or $doubleLabel Double-Time wait without Master Code). Sheildlenz Shield remains ON after unlock.")
             }
-            setTextColor(Color.parseColor("#4B6BA3"))
+            setTextColor(Color.parseColor("#5272B3"))
             textSize = 12f
             setLineSpacing(6f, 1.0f)
         }
@@ -342,7 +342,7 @@ class SystemOverlayController(private val context: Context) {
 
         val pinLabel = TextView(context).apply {
             text = "MASTER CODE / DOUBLE-TIME UNLOCK"
-            setTextColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.parseColor("#2B6CE6"))
             textSize = 11f
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -352,8 +352,8 @@ class SystemOverlayController(private val context: Context) {
 
         val pinField = EditText(context).apply {
             hint = "Enter Guardian Master Code / PIN"
-            setHintTextColor(Color.parseColor("#6B86B8"))
-            setTextColor(Color.parseColor("#1E408A"))
+            setHintTextColor(Color.parseColor("#728FC7"))
+            setTextColor(Color.parseColor("#1E4494"))
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
             typeface = Typeface.MONOSPACE
             textSize = 14f
@@ -369,7 +369,7 @@ class SystemOverlayController(private val context: Context) {
         val unlockBtn = Button(context).apply {
             text = "UNLOCK WITH MASTER CODE"
             setTextColor(Color.WHITE)
-            background = roundedBox("#2563EB", "#2563EB", 24f)
+            background = roundedBox("#2B6CE6", "#2B6CE6", 24f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textSize = 12f
             setPadding(24, 24, 24, 24)
@@ -416,8 +416,8 @@ class SystemOverlayController(private val context: Context) {
         val initialDoubleLabel = AegisPreferences.formatMinutesLabel(prefs.getDoubleTimeDurationMinutes()).uppercase(Locale.US)
         val doubleTimeBtn = Button(context).apply {
             text = "DON'T KNOW CODE? WAIT DOUBLE TIME ($initialDoubleLabel)"
-            setTextColor(Color.parseColor("#B87614"))
-            background = roundedBox("#FFF8E8", "#E8C374", 24f)
+            setTextColor(Color.parseColor("#D99B26"))
+            background = roundedBox("#FFF8E7", "#E8C374", 24f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textSize = 11f
             setPadding(20, 22, 20, 22)
@@ -441,7 +441,7 @@ class SystemOverlayController(private val context: Context) {
 
         val shieldNote = TextView(context).apply {
             text = "SHIELD CONTINUITY: Sheildlenz visual shield stays ON after both Master Code unlock and Double-Time completion."
-            setTextColor(Color.parseColor("#0D9488"))
+            setTextColor(Color.parseColor("#2B6CE6"))
             textSize = 11f
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -455,8 +455,8 @@ class SystemOverlayController(private val context: Context) {
 
         val emergencyBtn = Button(context).apply {
             text = "EMERGENCY DIALER"
-            setTextColor(Color.parseColor("#B87614"))
-            background = roundedBox("#FFF8E8", "#E8C374", 18f)
+            setTextColor(Color.parseColor("#D99B26"))
+            background = roundedBox("#FFF8E7", "#E8C374", 18f)
             textSize = 11f
             typeface = Typeface.MONOSPACE
             visibility = if (prefs.showEmergencyDialerOnLockdown.value) View.VISIBLE else View.GONE
@@ -493,18 +493,18 @@ class SystemOverlayController(private val context: Context) {
 
         val badge = TextView(context).apply {
             text = "ANTI-TAMPER PROTECTION ACTIVE"
-            setTextColor(Color.parseColor("#B87614"))
+            setTextColor(Color.parseColor("#D99B26"))
             textSize = 11f
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             gravity = Gravity.CENTER
-            background = roundedBox("#FFF8E8", "#E8C374", 50f)
+            background = roundedBox("#FFF8E7", "#E8C374", 50f)
             setPadding(32, 12, 32, 12)
         }
         root.addView(badge)
 
         val title = TextView(context).apply {
             text = "Guardian Authorization Required"
-            setTextColor(Color.parseColor("#1E408A"))
+            setTextColor(Color.parseColor("#1E4494"))
             textSize = 23f
             typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -514,7 +514,7 @@ class SystemOverlayController(private val context: Context) {
 
         val desc = TextView(context).apply {
             text = reason
-            setTextColor(Color.parseColor("#4B6BA3"))
+            setTextColor(Color.parseColor("#5272B3"))
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(28, 20, 28, 24)
@@ -526,8 +526,8 @@ class SystemOverlayController(private val context: Context) {
 
         val pinField = EditText(context).apply {
             hint = "Enter Guardian Password / PIN"
-            setHintTextColor(Color.parseColor("#6B86B8"))
-            setTextColor(Color.parseColor("#1E408A"))
+            setHintTextColor(Color.parseColor("#728FC7"))
+            setTextColor(Color.parseColor("#1E4494"))
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
             typeface = Typeface.MONOSPACE
             textSize = 14f
@@ -547,7 +547,7 @@ class SystemOverlayController(private val context: Context) {
         val verifyBtn = Button(context).apply {
             text = "AUTHORIZE GUARDIAN ($windowMins MIN WINDOW)"
             setTextColor(Color.WHITE)
-            background = roundedBox("#2563EB", "#2563EB", 24f)
+            background = roundedBox("#2B6CE6", "#2B6CE6", 24f)
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
             setPadding(24, 24, 24, 24)
@@ -574,7 +574,7 @@ class SystemOverlayController(private val context: Context) {
 
         val homeBtn = Button(context).apply {
             text = "RETURN TO HOME SCREEN"
-            setTextColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.parseColor("#2B6CE6"))
             background = roundedBox("#FFFFFF", "#D6E4FA", 24f)
             textSize = 12f
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
@@ -602,7 +602,7 @@ class SystemOverlayController(private val context: Context) {
     private fun createOverlayBrandingView(allowOpenLink: Boolean): View {
         return TextView(context).apply {
             text = "Built By AhsanTCr  •  ahsantcr.lovable.app"
-            setTextColor(Color.parseColor("#1E408A"))
+            setTextColor(Color.parseColor("#1E4494"))
             textSize = 11f
             typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -638,33 +638,33 @@ class SystemOverlayController(private val context: Context) {
         when {
             isDoubleTime && remainingMs > 0L -> {
                 countdownTitleView?.text = "STAGE 2 • DOUBLE-TIME WAIT ($doubleLabelUpper)"
-                countdownClockView?.setTextColor(Color.parseColor("#C28219"))
+                countdownClockView?.setTextColor(Color.parseColor("#D99B26"))
                 unlockHintView?.text = "Double-time wait active. Device opens automatically when timer hits 00:00:00 (or earlier with Guardian Master Code). Sheildlenz Shield remains ON."
                 pinInputView?.visibility = View.VISIBLE
                 unlockButtonView?.isEnabled = true
                 unlockButtonView?.text = "UNLOCK WITH MASTER CODE"
-                unlockButtonView?.background = roundedBox("#2563EB", "#2563EB", 24f)
+                unlockButtonView?.background = roundedBox("#2B6CE6", "#2B6CE6", 24f)
                 unlockButtonView?.setTextColor(Color.WHITE)
                 doubleTimeButtonView?.visibility = View.GONE
             }
 
             !isDoubleTime && remainingMs > 0L -> {
                 countdownTitleView?.text = "STAGE 1 • LOCKDOWN TIMER ($stage1LabelUpper)"
-                countdownClockView?.setTextColor(Color.parseColor("#B87614"))
+                countdownClockView?.setTextColor(Color.parseColor("#D99B26"))
                 if (!canEnterPassword) {
                     unlockHintView?.text = "Whole device is locked. After countdown completes: enter Master Code, or wait Double Time ($doubleLabel). Shield stays ON."
                     pinInputView?.visibility = View.GONE
                     unlockButtonView?.isEnabled = false
                     unlockButtonView?.text = "MASTER CODE LOCKED (${formatDuration(remainingMs)})"
-                    unlockButtonView?.background = roundedBox("#EBF3FF", "#D6E4FA", 24f)
-                    unlockButtonView?.setTextColor(Color.parseColor("#4B6BA3"))
+                    unlockButtonView?.background = roundedBox("#EEF4FF", "#D6E4FA", 24f)
+                    unlockButtonView?.setTextColor(Color.parseColor("#5272B3"))
                     doubleTimeButtonView?.visibility = View.GONE
                 } else {
                     unlockHintView?.text = "Enter Master Code to unlock, or tap Wait Double Time ($doubleLabel) if you do not know the code. Shield remains ON."
                     pinInputView?.visibility = View.VISIBLE
                     unlockButtonView?.isEnabled = true
                     unlockButtonView?.text = "UNLOCK WITH MASTER CODE"
-                    unlockButtonView?.background = roundedBox("#2563EB", "#2563EB", 24f)
+                    unlockButtonView?.background = roundedBox("#2B6CE6", "#2B6CE6", 24f)
                     unlockButtonView?.setTextColor(Color.WHITE)
                     doubleTimeButtonView?.visibility = View.VISIBLE
                     doubleTimeButtonView?.text = "DON'T KNOW CODE? WAIT DOUBLE TIME ($doubleLabelUpper)"
@@ -674,12 +674,12 @@ class SystemOverlayController(private val context: Context) {
             else -> {
                 countdownTitleView?.text = "TIME COMPLETE • MASTER CODE REQUIRED"
                 countdownClockView?.text = "00:00:00"
-                countdownClockView?.setTextColor(Color.parseColor("#0D9488"))
+                countdownClockView?.setTextColor(Color.parseColor("#2B6CE6"))
                 unlockHintView?.text = "Initial timer finished. Enter Master Code to open now, or wait Double Time ($doubleLabel) if you don't know the code. Shield remains ON after both."
                 pinInputView?.visibility = View.VISIBLE
                 unlockButtonView?.isEnabled = true
                 unlockButtonView?.text = "UNLOCK WITH MASTER CODE"
-                unlockButtonView?.background = roundedBox("#2563EB", "#2563EB", 24f)
+                unlockButtonView?.background = roundedBox("#2B6CE6", "#2B6CE6", 24f)
                 unlockButtonView?.setTextColor(Color.WHITE)
                 doubleTimeButtonView?.visibility = View.VISIBLE
                 doubleTimeButtonView?.text = "DON'T KNOW MASTER CODE? WAIT $doubleLabelUpper"
