@@ -58,12 +58,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.EngineTelemetry
 import com.example.core.models.SecurityIncident
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
+import com.example.detection.classifier.ModelImportResult
+import com.example.detection.classifier.ModelManager
 import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.MetricTile
+import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.StatusPill
 import com.example.ui.components.ThreatCategoryBadge
 import com.example.ui.theme.AegisCardBorder
@@ -78,6 +85,9 @@ import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisVoidBackground
 import com.example.ui.theme.AegisWarningAmber
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -86,20 +96,46 @@ import java.util.Locale
 fun DashboardScreen(
     protectionRepo: ProtectionRepository,
     historyRepo: SecurityHistoryRepository,
+    modelManager: ModelManager,
     onNavigateToLive: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToBlockScreen: () -> Unit,
+    onModelUpdated: () -> Unit = {},
     onRequestStartProtection: () -> Unit = {},
     onRequestStopProtection: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val telemetry by protectionRepo.telemetry.collectAsState()
     val totalDetections by historyRepo.getTotalDetectionsCount().collectAsState(initial = 0)
     val blockedAppCount by historyRepo.getBlockedAppCount().collectAsState(initial = 0)
     val latestIncident by historyRepo.getLatestIncident().collectAsState(initial = null)
 
     var showOverlayWarningDialog by remember { mutableStateOf(false) }
+    var showMissingModelDialog by remember { mutableStateOf(false) }
+
+    val quickModelPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val res = withContext(Dispatchers.IO) { modelManager.importModelFromUri(uri) }
+                onModelUpdated()
+                if (res is ModelImportResult.Success && telemetry.isOverlayPermitted && !telemetry.isProtectionEnabled) {
+                    onRequestStartProtection()
+                }
+            }
+        }
+    }
+
+    val attemptStartProtection = {
+        when {
+            !telemetry.isOverlayPermitted -> showOverlayWarningDialog = true
+            !telemetry.isModelLoaded -> showMissingModelDialog = true
+            else -> onRequestStartProtection()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -147,11 +183,7 @@ fun DashboardScreen(
                                 if (telemetry.isProtectionEnabled) {
                                     onRequestStopProtection()
                                 } else {
-                                    if (!telemetry.isOverlayPermitted) {
-                                        showOverlayWarningDialog = true
-                                    } else {
-                                        onRequestStartProtection()
-                                    }
+                                    attemptStartProtection()
                                 }
                             }
                             .testTag("shield_graphic_toggle"),
@@ -235,11 +267,7 @@ fun DashboardScreen(
                             checked = telemetry.isProtectionEnabled,
                             onCheckedChange = { isChecked ->
                                 if (isChecked) {
-                                    if (!telemetry.isOverlayPermitted) {
-                                        showOverlayWarningDialog = true
-                                    } else {
-                                        onRequestStartProtection()
-                                    }
+                                    attemptStartProtection()
                                 } else {
                                     onRequestStopProtection()
                                 }
@@ -262,27 +290,42 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    val aiHeadline = when {
+                        telemetry.modelErrorMessage != null -> "Model Error"
+                        telemetry.isModelLoaded && telemetry.isProtectionEnabled -> "TFLite Active"
+                        telemetry.isModelLoaded -> "Model Ready"
+                        else -> "No Model"
+                    }
+                    val aiColor = when {
+                        telemetry.modelErrorMessage != null -> AegisDangerRed
+                        telemetry.isModelLoaded && telemetry.isProtectionEnabled -> AegisSuccessGreen
+                        telemetry.isModelLoaded -> AegisPrimaryCyan
+                        else -> AegisWarningAmber
+                    }
+
                     CyberCard(
                         modifier = Modifier.weight(1f),
-                        borderColor = AegisPurple.copy(alpha = 0.3f)
+                        borderColor = aiColor.copy(alpha = 0.35f)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Psychology, contentDescription = null, tint = AegisPurple, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.Psychology, contentDescription = null, tint = aiColor, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(text = "AI ENGINE", color = AegisTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
                         Text(
-                            text = if (telemetry.isProtectionEnabled) "TFLite Ready" else "Standby",
-                            color = if (telemetry.isProtectionEnabled) AegisPrimaryCyan else AegisTextMuted,
+                            text = aiHeadline,
+                            color = aiColor,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             modifier = Modifier.padding(top = 6.dp)
                         )
                         Text(
-                            text = "Quantized MobileNet",
+                            text = telemetry.loadedModelName ?: "Load .tflite file",
                             color = AegisTextMuted,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -310,6 +353,15 @@ fun DashboardScreen(
                         )
                     }
                 }
+            }
+
+            // In-App TFLite Model Loader Card
+            item {
+                ModelManagerCard(
+                    telemetry = telemetry,
+                    modelManager = modelManager,
+                    onModelUpdated = onModelUpdated
+                )
             }
 
             // Metrics: Total Detections & Blocked Applications
@@ -469,6 +521,43 @@ fun DashboardScreen(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisTextSecondary)
                     ) {
                         Text("CANCEL")
+                    }
+                }
+            )
+        }
+
+        if (showMissingModelDialog) {
+            AlertDialog(
+                onDismissRequest = { showMissingModelDialog = false },
+                containerColor = AegisSecondaryBackground,
+                titleContentColor = AegisTextPrimary,
+                textContentColor = AegisTextSecondary,
+                title = { Text("No AI Model Loaded") },
+                text = {
+                    Text(
+                        "No .tflite classifier is attached yet. Load a compatible .tflite file from phone storage first so Aegis Shield can detect inappropriate content."
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showMissingModelDialog = false
+                            quickModelPickerLauncher.launch(arrayOf("*/*"))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisVoidBackground)
+                    ) {
+                        Text("LOAD .TFLITE", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = {
+                            showMissingModelDialog = false
+                            onRequestStartProtection()
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisWarningAmber)
+                    ) {
+                        Text("CAPTURE ONLY")
                     }
                 }
             )

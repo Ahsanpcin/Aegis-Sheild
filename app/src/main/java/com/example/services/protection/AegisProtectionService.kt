@@ -7,10 +7,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -28,6 +29,7 @@ import com.example.R
 import com.example.blocking.overlay.SystemOverlayController
 import com.example.core.models.SecurityIncident
 import com.example.core.models.ThreatCategory
+import com.example.core.models.ThreatSeverity
 import com.example.detection.classifier.TFLiteContentClassifier
 import com.example.detection.decision.ThreatDecisionEngine
 import com.example.detection.preprocessing.FramePreprocessor
@@ -38,6 +40,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 class AegisProtectionService : Service() {
@@ -62,21 +65,53 @@ class AegisProtectionService : Service() {
     private var frameCounter: Long = 0L
     private var fpsCounter: Int = 0
     private var lastFpsSampleTime: Long = 0L
+    private var isStopped = false
 
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "AegisProtectionService created.")
         createNotificationChannel()
 
-        framePreprocessor = FramePreprocessor(224, 224)
-        contentClassifier = TFLiteContentClassifier(this)
+        contentClassifier = TFLiteContentClassifier(this, container.modelManager)
+        framePreprocessor = FramePreprocessor(
+            inputWidth = contentClassifier.inputWidth,
+            inputHeight = contentClassifier.inputHeight,
+            isQuantizedUInt8 = contentClassifier.isQuantizedInput
+        )
         decisionEngine = ThreatDecisionEngine()
 
         val thread = HandlerThread("AegisFrameProcessor").apply { start() }
         backgroundThread = thread
         backgroundHandler = Handler(thread.looper)
 
+        container.refreshModelTelemetry()
         container.protectionRepository.setServiceRunning(true)
+
+        // Automatically reload classifier if user imports or clears a .tflite file while running
+        serviceScope.launch {
+            container.modelManager.modelVersion.drop(1).collect {
+                backgroundHandler?.post {
+                    val reloaded = contentClassifier.reloadModel()
+                    if (reloaded) {
+                        framePreprocessor.configure(
+                            width = contentClassifier.inputWidth,
+                            height = contentClassifier.inputHeight,
+                            quantizedUInt8 = contentClassifier.isQuantizedInput
+                        )
+                    }
+                    decisionEngine.reset()
+                    container.refreshModelTelemetry()
+                    val statusLabel = if (reloaded) {
+                        "Aegis Shield Active • AI Guardian Armed"
+                    } else {
+                        "Aegis Screen Capture Active • Load .tflite Model"
+                    }
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm?.notify(NOTIFICATION_ID, buildForegroundNotification(statusLabel))
+                    Log.i(TAG, "Service reloaded TFLite model cleanly. Ready=$reloaded")
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -93,9 +128,14 @@ class AegisProtectionService : Service() {
                 }
 
                 if (resultCode != 0 && resultData != null) {
-                    val notification = buildForegroundNotification("Aegis Shield Active • Visual Guardian Armed")
+                    val statusLabel = if (contentClassifier.isModelReady) {
+                        "Aegis Shield Active • AI Guardian Armed"
+                    } else {
+                        "Aegis Screen Capture Active • Load .tflite Model"
+                    }
+                    val notification = buildForegroundNotification(statusLabel)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
                     } else {
                         startForeground(NOTIFICATION_ID, notification)
                     }
@@ -135,9 +175,9 @@ class AegisProtectionService : Service() {
 
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
         windowManager.defaultDisplay.getRealMetrics(metrics)
 
-        // Subsampled capture surface: 480p width maintains aspect ratio with minimal GPU memory overhead
         val screenWidth = metrics.widthPixels
         val screenHeight = metrics.heightPixels
         val scale = 480f / screenWidth.coerceAtLeast(1)
@@ -151,12 +191,11 @@ class AegisProtectionService : Service() {
         reader.setOnImageAvailableListener({ ir ->
             val image = try {
                 ir.acquireLatestImage()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             } ?: return@setOnImageAvailableListener
 
             val currentTime = SystemClock.uptimeMillis()
-            // Throttle frame sampling to adaptive interval to prevent thermal throttling & battery drain
             if (currentTime - lastInspectionTimeMs < minInspectionIntervalMs) {
                 image.close()
                 return@setOnImageAvailableListener
@@ -181,14 +220,13 @@ class AegisProtectionService : Service() {
         container.protectionRepository.updateMediaProjectionState(true)
     }
 
-    private fun processFrame(image: android.media.Image) {
+    private fun processFrame(image: Image) {
         try {
             val bitmap = framePreprocessor.extractBitmapFromImage(image)
             image.close()
 
             if (bitmap == null) return
 
-            // Duplicate frame detector: skip redundant static / paused frames
             if (framePreprocessor.isFrameDuplicate(bitmap)) {
                 bitmap.recycle()
                 return
@@ -197,21 +235,33 @@ class AegisProtectionService : Service() {
             frameCounter++
             fpsCounter++
             val now = SystemClock.uptimeMillis()
-            if (now - lastFpsSampleTime >= 1000L) {
+            if (lastFpsSampleTime == 0L) {
+                lastFpsSampleTime = now
+            } else if (now - lastFpsSampleTime >= 1000L) {
                 val currentFps = (fpsCounter * 1000f) / (now - lastFpsSampleTime)
                 container.protectionRepository.recordInspectionMetrics(frameCounter, currentFps)
                 fpsCounter = 0
                 lastFpsSampleTime = now
             }
 
-            // Downsample and convert to normalized tensor buffer
+            // Do not attempt inference or fake results when no TFLite model is loaded
+            if (!contentClassifier.isModelReady) {
+                bitmap.recycle()
+                return
+            }
+
+            framePreprocessor.configure(
+                width = contentClassifier.inputWidth,
+                height = contentClassifier.inputHeight,
+                quantizedUInt8 = contentClassifier.isQuantizedInput
+            )
+
             val tensorBuffer = framePreprocessor.preprocessBitmapToTensorBuffer(bitmap)
             bitmap.recycle()
 
-            // Run TFLite inference
             val classification = contentClassifier.classifyTensorBuffer(tensorBuffer)
+            if (!classification.isModelLoaded) return
 
-            // Decision Engine evaluation against active policy
             val sensitivity = container.preferences.sensitivity.value
             val isStrictEverything = container.preferences.strictEverything.value
             val isMaintenance = container.preferences.maintenanceMode.value
@@ -233,23 +283,17 @@ class AegisProtectionService : Service() {
 
         Log.w(TAG, "THREAT CONFIRMED: ${category.name} in $targetAppName ($targetPkg). Executing instant intervention.")
 
-        // 1. Show Full-Screen System Overlay
         overlayController.showBlockOverlay(category, targetAppName, targetPkg, reason)
-
-        // 2. Accessibility Return-to-Home Action
         AegisAccessibilityService.performEmergencyHomeAction()
-
-        // 3. Strict Device Owner Mode: suspend package if provisioned as Device Owner
         AegisDeviceAdminReceiver.suspendPackageIfDeviceOwner(this, targetPkg)
 
-        // 4. Log Incident in Room Database
         serviceScope.launch {
             val incident = SecurityIncident(
                 timestampMillis = System.currentTimeMillis(),
                 packageName = targetPkg,
                 appDisplayName = targetAppName,
                 category = category,
-                severity = com.example.core.models.ThreatSeverity.HIGH,
+                severity = ThreatSeverity.HIGH,
                 confidenceScore = confidence,
                 actionTaken = "Display Shielded & Home Invoked"
             )
@@ -258,15 +302,26 @@ class AegisProtectionService : Service() {
         }
     }
 
-    private fun stopProtection() {
-        Log.i(TAG, "Stopping AegisProtectionService.")
-        virtualDisplay?.release()
+    private fun cleanupResources() {
+        if (isStopped) return
+        isStopped = true
+        Log.i(TAG, "Cleaning up AegisProtectionService resources.")
+        try {
+            virtualDisplay?.release()
+        } catch (_: Exception) {
+        }
         virtualDisplay = null
 
-        imageReader?.close()
+        try {
+            imageReader?.close()
+        } catch (_: Exception) {
+        }
         imageReader = null
 
-        mediaProjection?.stop()
+        try {
+            mediaProjection?.stop()
+        } catch (_: Exception) {
+        }
         mediaProjection = null
 
         overlayController.dismissBlockOverlay()
@@ -276,14 +331,18 @@ class AegisProtectionService : Service() {
 
         container.protectionRepository.updateMediaProjectionState(false)
         container.protectionRepository.setServiceRunning(false)
+    }
 
+    private fun stopProtection() {
+        cleanupResources()
+        @Suppress("DEPRECATION")
         stopForeground(true)
         stopSelf()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopProtection()
+        cleanupResources()
         backgroundThread?.quitSafely()
         backgroundThread = null
         serviceScope.cancel()

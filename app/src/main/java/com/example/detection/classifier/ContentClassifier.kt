@@ -11,13 +11,20 @@ data class ClassificationResult(
     val confidence: Float,
     val isModelLoaded: Boolean,
     val latencyMs: Long,
-    val diagnosticInfo: String
+    val diagnosticInfo: String,
+    val outputClassCount: Int = 0,
+    val rawClassScores: Map<String, Float> = emptyMap()
 )
 
 interface ContentClassifier {
     val isModelReady: Boolean
     val modelSpecification: String
+    val inputWidth: Int
+    val inputHeight: Int
+    val isQuantizedInput: Boolean
+    val outputClassCount: Int
 
     fun classifyTensorBuffer(tensorBuffer: ByteBuffer): ClassificationResult
+    fun reloadModel(): Boolean
     fun close()
 }

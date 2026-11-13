@@ -67,8 +67,11 @@ import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.core.models.SensitivityLevel
 import com.example.core.permissions.PermissionHelper
 import com.example.data.preferences.AegisPreferences
+import com.example.data.repository.ProtectionRepository
+import com.example.detection.classifier.ModelManager
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
+import com.example.ui.components.ModelManagerCard
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
@@ -85,9 +88,13 @@ import com.example.ui.theme.AegisWarningAmber
 @Composable
 fun SettingsScreen(
     preferences: AegisPreferences,
-    onNavigateBack: () -> Unit
+    modelManager: ModelManager,
+    protectionRepo: ProtectionRepository,
+    onNavigateBack: () -> Unit,
+    onModelUpdated: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val telemetry by protectionRepo.telemetry.collectAsState()
     val sensitivity by preferences.sensitivity.collectAsState()
     val isStrictEverything by preferences.strictEverything.collectAsState()
     val isAutoStart by preferences.autoStart.collectAsState()
@@ -181,6 +188,15 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            // AI Model (.tflite) Storage Loader
+            item {
+                ModelManagerCard(
+                    telemetry = telemetry,
+                    modelManager = modelManager,
+                    onModelUpdated = onModelUpdated
+                )
             }
 
             // Detection Sensitivity Policy

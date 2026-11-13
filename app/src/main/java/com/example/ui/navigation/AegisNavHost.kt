@@ -66,10 +66,12 @@ fun AegisNavHost(
             DashboardScreen(
                 protectionRepo = container.protectionRepository,
                 historyRepo = container.securityHistoryRepository,
+                modelManager = container.modelManager,
                 onNavigateToLive = { navController.navigate(AegisDestinations.LIVE_PROTECTION) },
                 onNavigateToHistory = { navController.navigate(AegisDestinations.SECURITY_HISTORY) },
                 onNavigateToSettings = { navController.navigate(AegisDestinations.SETTINGS) },
                 onNavigateToBlockScreen = { navController.navigate(AegisDestinations.BLOCK_SCREEN) },
+                onModelUpdated = { container.refreshModelTelemetry() },
                 onRequestStartProtection = onRequestStartProtection,
                 onRequestStopProtection = onRequestStopProtection
             )
@@ -79,8 +81,11 @@ fun AegisNavHost(
             LiveProtectionScreen(
                 protectionRepo = container.protectionRepository,
                 historyRepo = container.securityHistoryRepository,
+                modelManager = container.modelManager,
+                preferences = container.preferences,
                 onNavigateBack = { navController.popBackStack() },
-                onTriggerBlockOverlay = { navController.navigate(AegisDestinations.BLOCK_SCREEN) }
+                onTriggerBlockOverlay = { navController.navigate(AegisDestinations.BLOCK_SCREEN) },
+                onModelUpdated = { container.refreshModelTelemetry() }
             )
         }
 
@@ -94,7 +99,10 @@ fun AegisNavHost(
         composable(AegisDestinations.SETTINGS) {
             SettingsScreen(
                 preferences = container.preferences,
-                onNavigateBack = { navController.popBackStack() }
+                modelManager = container.modelManager,
+                protectionRepo = container.protectionRepository,
+                onNavigateBack = { navController.popBackStack() },
+                onModelUpdated = { container.refreshModelTelemetry() }
             )
         }
 

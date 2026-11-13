@@ -1,26 +1,46 @@
 package com.example.detection.preprocessing
 
 import android.graphics.Bitmap
-import android.graphics.PixelFormat
 import android.media.Image
-import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class FramePreprocessor(
-    val inputWidth: Int = 224,
-    val inputHeight: Int = 224
+    inputWidth: Int = 224,
+    inputHeight: Int = 224,
+    isQuantizedUInt8: Boolean = false
 ) {
-    // Reusable direct byte buffer for TFLite input tensor [1, 224, 224, 3] Float32 (4 bytes per float)
-    private val tensorBuffer: ByteBuffer = ByteBuffer.allocateDirect(1 * inputWidth * inputHeight * 3 * 4).apply {
-        order(ByteOrder.nativeOrder())
-    }
+    var inputWidth: Int = inputWidth
+        private set
+    var inputHeight: Int = inputHeight
+        private set
+    var isQuantizedUInt8: Boolean = isQuantizedUInt8
+        private set
 
-    private val intValues = IntArray(inputWidth * inputHeight)
+    private var tensorBuffer: ByteBuffer = allocateBuffer(inputWidth, inputHeight, isQuantizedUInt8)
+    private var intValues: IntArray = IntArray(inputWidth * inputHeight)
 
     // Hash/fingerprint of previously inspected frame to avoid re-processing identical video/static frames
     private var hasProcessedFrame: Boolean = false
     private var lastSampleHash: Long = 0L
+
+    fun configure(width: Int, height: Int, quantizedUInt8: Boolean) {
+        if (this.inputWidth == width && this.inputHeight == height && this.isQuantizedUInt8 == quantizedUInt8) {
+            return
+        }
+        this.inputWidth = width
+        this.inputHeight = height
+        this.isQuantizedUInt8 = quantizedUInt8
+        this.tensorBuffer = allocateBuffer(width, height, quantizedUInt8)
+        this.intValues = IntArray(width * height)
+    }
+
+    private fun allocateBuffer(width: Int, height: Int, quantizedUInt8: Boolean): ByteBuffer {
+        val bytesPerChannel = if (quantizedUInt8) 1 else 4
+        return ByteBuffer.allocateDirect(1 * width * height * 3 * bytesPerChannel).apply {
+            order(ByteOrder.nativeOrder())
+        }
+    }
 
     /**
      * Extracts a downsampled ARGB Bitmap from an ImageReader Image buffer.
@@ -42,7 +62,6 @@ class FramePreprocessor(
         )
         bitmap.copyPixelsFromBuffer(buffer)
 
-        // If rowPadding exists, crop to exact image width/height
         return if (rowPadding > 0) {
             val cropped = Bitmap.createBitmap(bitmap, 0, 0, image.width, image.height)
             if (cropped != bitmap) {
@@ -84,7 +103,7 @@ class FramePreprocessor(
 
     /**
      * Scales bitmap to model input dimensions [inputWidth x inputHeight] and fills
-     * the direct ByteBuffer with normalized RGB values (0.0f..1.0f).
+     * the direct ByteBuffer with either normalized Float32 RGB [0.0f..1.0f] or UInt8 [0..255].
      */
     fun preprocessBitmapToTensorBuffer(bitmap: Bitmap): ByteBuffer {
         val scaledBitmap = if (bitmap.width != inputWidth || bitmap.height != inputHeight) {
@@ -99,18 +118,24 @@ class FramePreprocessor(
         }
 
         tensorBuffer.rewind()
-        // Convert [ARGB_8888] -> normalized RGB [0.0f .. 1.0f]
-        for (i in 0 until inputWidth * inputHeight) {
-            val pixel = intValues[i]
-            val r = ((pixel shr 16) and 0xFF) / 255.0f
-            val g = ((pixel shr 8) and 0xFF) / 255.0f
-            val b = (pixel and 0xFF) / 255.0f
-
-            tensorBuffer.putFloat(r)
-            tensorBuffer.putFloat(g)
-            tensorBuffer.putFloat(b)
+        val pixelCount = inputWidth * inputHeight
+        if (isQuantizedUInt8) {
+            for (i in 0 until pixelCount) {
+                val pixel = intValues[i]
+                tensorBuffer.put(((pixel shr 16) and 0xFF).toByte())
+                tensorBuffer.put(((pixel shr 8) and 0xFF).toByte())
+                tensorBuffer.put((pixel and 0xFF).toByte())
+            }
+        } else {
+            for (i in 0 until pixelCount) {
+                val pixel = intValues[i]
+                tensorBuffer.putFloat(((pixel shr 16) and 0xFF) / 255.0f)
+                tensorBuffer.putFloat(((pixel shr 8) and 0xFF) / 255.0f)
+                tensorBuffer.putFloat((pixel and 0xFF) / 255.0f)
+            }
         }
 
+        tensorBuffer.rewind()
         return tensorBuffer
     }
 

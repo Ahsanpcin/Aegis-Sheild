@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.core.models.EngineTelemetry
 import com.example.core.models.ThreatCategory
 import com.example.core.permissions.PermissionHelper
+import com.example.detection.classifier.ActiveModelInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,11 +33,29 @@ class ProtectionRepository(private val context: Context) {
         _telemetry.update { current ->
             current.copy(
                 isOverlayPermitted = hasOverlay,
-                statusMessage = if (current.isProtectionEnabled) {
-                    if (hasOverlay) "Protection Armed • Scanning Active" else "Warning: Overlay Permission Missing"
-                } else {
-                    "Protection Disengaged (Standby)"
-                }
+                statusMessage = buildStatusMessage(
+                    isEnabled = current.isProtectionEnabled,
+                    hasOverlay = hasOverlay,
+                    isModelLoaded = current.isModelLoaded
+                )
+            )
+        }
+    }
+
+    fun updateModelInfo(info: ActiveModelInfo) {
+        _telemetry.update { current ->
+            current.copy(
+                isModelLoaded = info.isLoaded,
+                loadedModelName = info.displayName,
+                modelInputSpec = info.inputSpecLabel,
+                modelOutputClasses = info.outputClassCount,
+                modelStatusMessage = info.statusMessage,
+                modelErrorMessage = info.errorMessage,
+                statusMessage = buildStatusMessage(
+                    isEnabled = current.isProtectionEnabled,
+                    hasOverlay = current.isOverlayPermitted,
+                    isModelLoaded = info.isLoaded
+                )
             )
         }
     }
@@ -58,11 +77,11 @@ class ProtectionRepository(private val context: Context) {
             current.copy(
                 isProtectionEnabled = enabled,
                 isOverlayPermitted = hasOverlay,
-                statusMessage = if (enabled) {
-                    "Protection Armed • Monitoring Ready"
-                } else {
-                    "Protection Disengaged (Standby)"
-                }
+                statusMessage = buildStatusMessage(
+                    isEnabled = enabled,
+                    hasOverlay = hasOverlay,
+                    isModelLoaded = current.isModelLoaded
+                )
             )
         }
         return true
@@ -72,7 +91,11 @@ class ProtectionRepository(private val context: Context) {
         _telemetry.update { current ->
             current.copy(
                 isProtectionEnabled = isRunning,
-                statusMessage = if (isRunning) "Visual Guardian Armed • Scanning Stream" else "Protection Disengaged (Standby)"
+                statusMessage = buildStatusMessage(
+                    isEnabled = isRunning,
+                    hasOverlay = current.isOverlayPermitted,
+                    isModelLoaded = current.isModelLoaded
+                )
             )
         }
     }
@@ -105,6 +128,15 @@ class ProtectionRepository(private val context: Context) {
                 lastDetectionTimestamp = System.currentTimeMillis(),
                 lastDetectedCategory = category
             )
+        }
+    }
+
+    private fun buildStatusMessage(isEnabled: Boolean, hasOverlay: Boolean, isModelLoaded: Boolean): String {
+        return when {
+            !isEnabled -> "Protection Disengaged (Standby)"
+            !hasOverlay -> "Warning: Overlay Permission Missing"
+            !isModelLoaded -> "Screen Capture Active • Model Missing (.tflite)"
+            else -> "Visual Guardian Armed • AI Scanning Active"
         }
     }
 }

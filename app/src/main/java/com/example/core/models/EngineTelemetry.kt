@@ -10,5 +10,11 @@ data class EngineTelemetry(
     val lastDetectionTimestamp: Long? = null,
     val lastDetectedCategory: ThreatCategory? = null,
     val activeMonitoredPackage: String? = null,
-    val statusMessage: String = "Protection Disengaged (Standby)"
+    val statusMessage: String = "Protection Disengaged (Standby)",
+    val isModelLoaded: Boolean = false,
+    val loadedModelName: String? = null,
+    val modelInputSpec: String = "Not Loaded",
+    val modelOutputClasses: Int = 0,
+    val modelStatusMessage: String = "No .tflite model loaded",
+    val modelErrorMessage: String? = null
 )

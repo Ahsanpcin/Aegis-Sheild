@@ -44,11 +44,15 @@ import androidx.compose.ui.unit.sp
 import com.example.core.models.SecurityIncident
 import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
+import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
+import com.example.detection.classifier.ModelManager
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.MetricTile
+import com.example.ui.components.ModelManagerCard
+import com.example.ui.components.SampleImageTesterCard
 import com.example.ui.components.StatusPill
 import com.example.ui.components.ThreatCategoryBadge
 import com.example.ui.theme.AegisCardBorder
@@ -61,17 +65,23 @@ import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisVoidBackground
+import com.example.ui.theme.AegisWarningAmber
 import kotlinx.coroutines.launch
 
 @Composable
 fun LiveProtectionScreen(
     protectionRepo: ProtectionRepository,
     historyRepo: SecurityHistoryRepository,
+    modelManager: ModelManager,
+    preferences: AegisPreferences,
     onNavigateBack: () -> Unit,
-    onTriggerBlockOverlay: () -> Unit
+    onTriggerBlockOverlay: () -> Unit,
+    onModelUpdated: () -> Unit = {}
 ) {
     val telemetry by protectionRepo.telemetry.collectAsState()
     val activeAppName by protectionRepo.activeAppLabel.collectAsState()
+    val sensitivity by preferences.sensitivity.collectAsState()
+    val isStrictEverything by preferences.strictEverything.collectAsState()
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -112,9 +122,19 @@ fun LiveProtectionScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
+                            val subtitleState = when {
+                                telemetry.isProtectionEnabled && telemetry.isModelLoaded -> "Armed & Scanning"
+                                telemetry.isProtectionEnabled -> "Capture Active (No AI Model)"
+                                else -> "Standby (Disengaged)"
+                            }
+                            val subtitleColor = when {
+                                telemetry.isProtectionEnabled && telemetry.isModelLoaded -> AegisSuccessGreen
+                                telemetry.isProtectionEnabled -> AegisWarningAmber
+                                else -> AegisTextMuted
+                            }
                             Text(
-                                text = if (telemetry.isProtectionEnabled) "Armed & Scanning" else "Standby (Disengaged)",
-                                color = if (telemetry.isProtectionEnabled) AegisSuccessGreen else AegisTextMuted,
+                                text = subtitleState,
+                                color = subtitleColor,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -166,6 +186,24 @@ fun LiveProtectionScreen(
                 }
             }
 
+            // In-App TFLite Model Manager & Sample Image Diagnostic Tester
+            item {
+                ModelManagerCard(
+                    telemetry = telemetry,
+                    modelManager = modelManager,
+                    onModelUpdated = onModelUpdated
+                )
+            }
+
+            item {
+                SampleImageTesterCard(
+                    telemetry = telemetry,
+                    modelManager = modelManager,
+                    sensitivity = sensitivity,
+                    isStrictEverything = isStrictEverything
+                )
+            }
+
             // AI Scanning Details
             item {
                 CyberCard(borderColor = AegisPurple.copy(alpha = 0.35f)) {
@@ -192,9 +230,13 @@ fun LiveProtectionScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     TelemetryDataRow(label = "Active Monitored App", value = activeAppName)
-                    TelemetryDataRow(label = "Target Architecture", value = "TensorFlow Lite On-Device (INT8)")
-                    TelemetryDataRow(label = "Input Tensor Dimension", value = "224 x 224 x 3 (Bilinear RGB)")
-                    TelemetryDataRow(label = "Inference Target", value = "CPU / NNAPI Hardware Delegate")
+                    TelemetryDataRow(label = "Model Status", value = telemetry.modelStatusMessage)
+                    TelemetryDataRow(label = "Loaded File", value = telemetry.loadedModelName ?: "None (Load .tflite)")
+                    TelemetryDataRow(label = "Input Tensor Dimension", value = telemetry.modelInputSpec)
+                    TelemetryDataRow(
+                        label = "Output Format",
+                        value = if (telemetry.modelOutputClasses > 0) "${telemetry.modelOutputClasses}-Class Auto" else "Unconfigured"
+                    )
                     TelemetryDataRow(
                         label = "Active Detection Category",
                         value = telemetry.lastDetectedCategory?.displayName ?: "None (Clean Screen Stream)"

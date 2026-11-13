@@ -11,7 +11,9 @@ import com.example.data.local.AegisDatabase
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
+import com.example.detection.classifier.ActiveModelInfo
 import com.example.detection.classifier.ClassificationResult
+import com.example.detection.classifier.ModelManager
 import com.example.detection.decision.ThreatDecisionEngine
 import com.example.detection.preprocessing.FramePreprocessor
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
@@ -25,6 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSettings
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -240,5 +243,75 @@ class ExampleRobolectricTest {
         // Clean up
         repo.clearHistory()
         assertEquals(0, repo.getTotalDetectionsCount().first())
+    }
+
+    @Test
+    fun `model manager reports missing status cleanly when no tflite exists`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        val manager = ModelManager(context, prefs)
+        manager.clearImportedModel()
+
+        val info = manager.refreshStatus()
+        assertFalse(info.isLoaded)
+        assertEquals("No .tflite model loaded", info.statusMessage)
+    }
+
+    @Test
+    fun `protection repository reflects model state honestly even when capture is enabled`() {
+        ShadowSettings.setCanDrawOverlays(true)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val repo = ProtectionRepository(context)
+
+        repo.setProtectionEnabled(true)
+        repo.updateModelInfo(
+            ActiveModelInfo(
+                isLoaded = false,
+                displayName = null,
+                sourceLabel = "None",
+                statusMessage = "No .tflite model loaded"
+            )
+        )
+
+        val missingTelemetry = repo.telemetry.value
+        assertTrue(missingTelemetry.isProtectionEnabled)
+        assertFalse(missingTelemetry.isModelLoaded)
+        assertEquals("Screen Capture Active • Model Missing (.tflite)", missingTelemetry.statusMessage)
+        assertEquals("No .tflite model loaded", missingTelemetry.modelStatusMessage)
+
+        repo.updateModelInfo(
+            ActiveModelInfo(
+                isLoaded = true,
+                displayName = "nsfw_mobilenet.tflite",
+                sourceLabel = "Phone Storage",
+                inputWidth = 224,
+                inputHeight = 224,
+                isQuantizedInput = false,
+                outputClassCount = 5,
+                inputSpecLabel = "224x224 Float32",
+                statusMessage = "Model Ready (5-Class)"
+            )
+        )
+
+        val loadedTelemetry = repo.telemetry.value
+        assertTrue(loadedTelemetry.isModelLoaded)
+        assertEquals("Visual Guardian Armed • AI Scanning Active", loadedTelemetry.statusMessage)
+        assertEquals("nsfw_mobilenet.tflite", loadedTelemetry.loadedModelName)
+        assertEquals(5, loadedTelemetry.modelOutputClasses)
+        assertEquals("224x224 Float32", loadedTelemetry.modelInputSpec)
+    }
+
+    @Test
+    fun `frame preprocessor reconfigures buffer capacity for uint8 and float32 models`() {
+        val preprocessor = FramePreprocessor(224, 224, isQuantizedUInt8 = false)
+        val bitmap = Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888)
+
+        val floatBuffer = preprocessor.preprocessBitmapToTensorBuffer(bitmap)
+        assertEquals(224 * 224 * 3 * 4, floatBuffer.capacity())
+
+        preprocessor.configure(width = 299, height = 299, quantizedUInt8 = true)
+        val uint8Buffer = preprocessor.preprocessBitmapToTensorBuffer(bitmap)
+        assertEquals(299 * 299 * 3, uint8Buffer.capacity())
+        assertTrue(preprocessor.isQuantizedUInt8)
     }
 }

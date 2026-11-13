@@ -5,22 +5,36 @@ import com.example.data.local.AegisDatabase
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
+import com.example.detection.classifier.ModelManager
 
 class AegisContainer(context: Context) {
+    private val appContext = context.applicationContext
+
     val database: AegisDatabase by lazy {
-        AegisDatabase.getInstance(context)
+        AegisDatabase.getInstance(appContext)
     }
 
     val preferences: AegisPreferences by lazy {
-        AegisPreferences(context)
+        AegisPreferences(appContext)
+    }
+
+    val modelManager: ModelManager by lazy {
+        ModelManager(appContext, preferences)
     }
 
     val protectionRepository: ProtectionRepository by lazy {
-        ProtectionRepository(context)
+        ProtectionRepository(appContext).apply {
+            updateModelInfo(modelManager.activeModelInfo.value)
+        }
     }
 
     val securityHistoryRepository: SecurityHistoryRepository by lazy {
         SecurityHistoryRepository(database.incidentDao())
+    }
+
+    fun refreshModelTelemetry() {
+        val info = modelManager.refreshStatus()
+        protectionRepository.updateModelInfo(info)
     }
 
     companion object {

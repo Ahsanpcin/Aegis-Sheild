@@ -29,6 +29,9 @@ class AegisPreferences(context: Context) {
     private val _isOnboardingCompleted = MutableStateFlow(prefs.getBoolean(KEY_ONBOARDING_DONE, false))
     val isOnboardingCompleted: StateFlow<Boolean> = _isOnboardingCompleted.asStateFlow()
 
+    private val _importedModelName = MutableStateFlow(prefs.getString(KEY_IMPORTED_MODEL_NAME, null))
+    val importedModelName: StateFlow<String?> = _importedModelName.asStateFlow()
+
     private fun getSavedSensitivity(): SensitivityLevel {
         val name = prefs.getString(KEY_SENSITIVITY, SensitivityLevel.BALANCED.name)
         return try {
@@ -63,6 +66,15 @@ class AegisPreferences(context: Context) {
         _maintenanceMode.value = enabled
     }
 
+    fun setImportedModelName(name: String?) {
+        if (name == null) {
+            prefs.edit().remove(KEY_IMPORTED_MODEL_NAME).apply()
+        } else {
+            prefs.edit().putString(KEY_IMPORTED_MODEL_NAME, name).apply()
+        }
+        _importedModelName.value = name
+    }
+
     fun verifyGuardianPin(pin: String): Boolean {
         val storedHash = prefs.getString(KEY_PIN_HASH, null) ?: return true // If not set, allow
         val inputHash = hashPin(pin)
@@ -93,5 +105,6 @@ class AegisPreferences(context: Context) {
         private const val KEY_PIN_HASH = "key_guardian_pin_hash"
         private const val KEY_MAINTENANCE_MODE = "key_maintenance_mode"
         private const val KEY_ONBOARDING_DONE = "key_onboarding_done"
+        private const val KEY_IMPORTED_MODEL_NAME = "key_imported_model_name"
     }
 }
