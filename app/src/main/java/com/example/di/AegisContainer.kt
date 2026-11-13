@@ -1,6 +1,7 @@
 package com.example.di
 
 import android.content.Context
+import com.example.blocking.overlay.SystemOverlayController
 import com.example.data.local.AegisDatabase
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
@@ -30,6 +31,10 @@ class AegisContainer(context: Context) {
 
     val securityHistoryRepository: SecurityHistoryRepository by lazy {
         SecurityHistoryRepository(database.incidentDao())
+    }
+
+    val overlayController: SystemOverlayController by lazy {
+        SystemOverlayController(appContext)
     }
 
     fun refreshModelTelemetry() {

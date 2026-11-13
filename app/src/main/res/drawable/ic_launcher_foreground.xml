@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/aegis_shield_icon_1794471114674"
+        android:drawable="@drawable/sheildlenz_icon_1794545987369"
         android:gravity="center" />
 </layer-list>

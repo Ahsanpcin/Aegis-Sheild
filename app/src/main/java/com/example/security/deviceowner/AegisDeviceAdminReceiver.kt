@@ -8,7 +8,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.UserManager
 import android.util.Log
-import com.example.blocking.overlay.SystemOverlayController
 import com.example.di.AegisContainer
 import com.example.monitoring.accessibility.AegisAccessibilityService
 
@@ -16,7 +15,7 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
 
     override fun onEnabled(context: Context, intent: Intent) {
         super.onEnabled(context, intent)
-        Log.i(TAG, "Aegis Shield Device Administrator privilege enabled.")
+        Log.i(TAG, "Sheildlenz Device Administrator privilege enabled.")
         applyDeviceOwnerHardeningIfEligible(context)
     }
 
@@ -26,16 +25,16 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
         if (!authorized) {
             Log.w(TAG, "Unauthorized attempt to disable Aegis Device Administrator blocked.")
             AegisAccessibilityService.performEmergencyHomeAction()
-            SystemOverlayController(context.applicationContext).showTamperLockOverlay(
+            AegisContainer.getInstance(context).overlayController.showTamperLockOverlay(
                 reason = "Unauthorized attempt to deactivate Device Administrator was intercepted. Guardian Password is required."
             )
         }
-        return "AEGIS SHIELD ANTI-TAMPER PROTECTION: Guardian Password verification is required before Device Administrator can be deactivated."
+        return "SHEILDLENZ ANTI-TAMPER PROTECTION: Guardian Password verification is required before Device Administrator can be deactivated."
     }
 
     override fun onDisabled(context: Context, intent: Intent) {
         super.onDisabled(context, intent)
-        Log.w(TAG, "Aegis Shield Device Administrator privilege disabled.")
+        Log.w(TAG, "Sheildlenz Device Administrator privilege disabled.")
     }
 
     companion object {
@@ -50,7 +49,7 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
                 putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, getComponentName(context))
                 putExtra(
                     DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                    "Activates anti-tamper protection and requires Guardian Password before Aegis Shield administration can be disabled or uninstalled."
+                    "Activates anti-tamper protection and requires Guardian Password before Sheildlenz administration can be disabled or uninstalled."
                 )
             }
         }
@@ -90,7 +89,7 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
                 ?: return false
 
             if (!dpm.isDeviceOwnerApp(context.packageName)) {
-                Log.d(TAG, "Cannot suspend package: Aegis Shield is not provisioned as Device Owner.")
+                Log.d(TAG, "Cannot suspend package: Sheildlenz is not provisioned as Device Owner.")
                 return false
             }
 

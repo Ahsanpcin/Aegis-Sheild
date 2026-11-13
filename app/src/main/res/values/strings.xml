@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Aegis Shield</string>
-    <string name="accessibility_service_description">Aegis Shield accessibility service identifies the active foreground application package and enables emergency return-to-home actions when inappropriate visual content is detected. No keystrokes or private messages are ever collected.</string>
-    <string name="device_admin_description">Aegis Shield Device Administrator privileges allow Strict Device Owner application suspension policy enforcement.</string>
+    <string name="app_name">Sheildlenz</string>
+    <string name="accessibility_service_description">Sheildlenz accessibility service identifies the active foreground application package and enables emergency return-to-home actions when inappropriate visual content is detected. No keystrokes or private messages are ever collected.</string>
+    <string name="device_admin_description">Sheildlenz Device Administrator privileges allow Strict Device Owner application suspension policy enforcement.</string>
 </resources>

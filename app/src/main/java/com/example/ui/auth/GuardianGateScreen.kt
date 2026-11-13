@@ -1,9 +1,6 @@
 package com.example.ui.auth
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,10 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -45,17 +38,17 @@ import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.components.CyberCard
+import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
-import com.example.ui.theme.AegisVoidBackground
+import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 
 @Composable
@@ -68,32 +61,27 @@ fun GuardianGateScreen(
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
 
-    Box(
+    SheildlenzBackdrop(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(AegisVoidBackground, AegisSecondaryBackground, AegisVoidBackground)
-                )
-            )
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(24.dp)
-            .testTag("guardian_gate_screen"),
-        contentAlignment = Alignment.Center
+            .testTag("guardian_gate_screen")
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             AegisShieldGraphic(
                 isProtected = telemetry.isProtectionEnabled,
                 isThreatActive = false,
-                size = 132.dp
+                size = 140.dp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             StatusPill(
                 label = if (telemetry.isProtectionEnabled) "PROTECTION ARMED" else "SHIELD STANDBY",
@@ -107,17 +95,18 @@ fun GuardianGateScreen(
             Text(
                 text = "Guardian Access Only",
                 color = AegisTextPrimary,
-                fontSize = 26.sp,
+                fontSize = 27.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = ClassicalDisplayFont,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = "Only the Guardian may open Aegis Shield to adjust policies, load models, view logs, or alter protection.",
+                text = "Only the Guardian may open Sheildlenz to adjust policies, load models, view logs, or alter protection.",
                 color = AegisTextSecondary,
                 fontSize = 13.sp,
-                lineHeight = 19.sp,
+                lineHeight = 20.sp,
+                fontFamily = ClassicalBodyFont,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
             )
@@ -131,13 +120,14 @@ fun GuardianGateScreen(
                             pinError = null
                         }
                     },
-                    label = { Text("Guardian Password / PIN") },
+                    label = { Text("Guardian Password / PIN", fontFamily = ClassicalBodyFont) },
                     leadingIcon = {
                         Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan)
                     },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     isError = pinError != null,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AegisPrimaryCyan,
@@ -155,6 +145,7 @@ fun GuardianGateScreen(
                         text = pinError!!,
                         color = AegisDangerRed,
                         fontSize = 12.sp,
+                        fontFamily = ClassicalBodyFont,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -175,7 +166,7 @@ fun GuardianGateScreen(
                         containerColor = AegisPrimaryCyan,
                         contentColor = AegisOnPrimaryWhite
                     ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
@@ -185,7 +176,8 @@ fun GuardianGateScreen(
                         text = "UNLOCK GUARDIAN CONSOLE",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = ClassicalBodyFont,
+                        letterSpacing = 0.8.sp
                     )
                 }
             }

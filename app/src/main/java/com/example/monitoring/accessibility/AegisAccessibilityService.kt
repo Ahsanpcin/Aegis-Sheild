@@ -8,13 +8,12 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import com.example.blocking.overlay.SystemOverlayController
 import com.example.di.AegisContainer
 
 class AegisAccessibilityService : AccessibilityService() {
 
     private val container by lazy { AegisContainer.getInstance(this) }
-    private val overlayController by lazy { SystemOverlayController(this) }
+    private val overlayController get() = container.overlayController
     private var lastTamperInterceptTimeMs: Long = 0L
 
     override fun onServiceConnected() {
@@ -191,7 +190,7 @@ class AegisAccessibilityService : AccessibilityService() {
         private const val TAG = "AegisAccessibility"
 
         private val PROTECTED_KEYWORDS = listOf(
-            "aegis shield",
+            "sheildlenz",
             "device admin",
             "device administrator",
             "device administrators",

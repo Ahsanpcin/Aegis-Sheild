@@ -2,11 +2,6 @@ package com.example.ui.splash
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,9 +11,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,12 +35,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.AegisShieldGraphic
+import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
-import com.example.ui.theme.AegisVoidBackground
+import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 import kotlinx.coroutines.delay
 
@@ -54,34 +50,34 @@ fun SplashScreen(
     isOnboardingCompleted: Boolean,
     onNavigateNext: (destination: String) -> Unit
 ) {
-    val scale = remember { Animatable(0.7f) }
+    val scale = remember { Animatable(0.75f) }
     val alpha = remember { Animatable(0f) }
-    var initStatus by remember { mutableStateOf("Initializing Aegis Security Core...") }
-    var progress by remember { mutableStateOf(0.15f) }
+    var initStatus by remember { mutableStateOf("Initializing Sheildlenz Security Core...") }
+    var progress by remember { mutableStateOf(0.18f) }
 
     LaunchedEffect(Unit) {
         scale.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing)
         )
         alpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 600)
+            animationSpec = tween(durationMillis = 550)
         )
 
-        delay(400)
+        delay(350)
         initStatus = "Verifying On-Device AI Pipeline..."
-        progress = 0.50f
-
-        delay(400)
-        initStatus = "Auditing Screen Protection Policy..."
-        progress = 0.85f
-
-        delay(400)
-        initStatus = "Aegis Core Armed • Ready"
-        progress = 1.0f
+        progress = 0.55f
 
         delay(350)
+        initStatus = "Auditing Screen Protection Policy..."
+        progress = 0.88f
+
+        delay(350)
+        initStatus = "Sheildlenz Core Armed • Ready"
+        progress = 1.0f
+
+        delay(320)
         if (isOnboardingCompleted) {
             onNavigateNext("dashboard")
         } else {
@@ -89,21 +85,17 @@ fun SplashScreen(
         }
     }
 
-    Box(
+    SheildlenzBackdrop(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(AegisVoidBackground, AegisSecondaryBackground, AegisVoidBackground)
-                )
-            )
-            .testTag("splash_screen_root"),
-        contentAlignment = Alignment.Center
+            .testTag("splash_screen_root")
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(28.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -114,29 +106,44 @@ fun SplashScreen(
                 AegisShieldGraphic(
                     isProtected = true,
                     isThreatActive = false,
-                    size = 200.dp
+                    size = 205.dp
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Text(
-                text = "AEGIS SHIELD",
+                text = "SHEILDLENZ",
                 color = AegisTextPrimary,
-                fontSize = 30.sp,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 3.sp,
+                letterSpacing = 3.5.sp,
                 fontFamily = ClassicalDisplayFont
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Ornamental Champagne Gold Rule
+            Box(
+                modifier = Modifier
+                    .width(72.dp)
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color.Transparent, AegisChampagneGold, Color.Transparent)
+                        )
+                    )
+            )
+
             Text(
-                text = "AI-POWERED CONTENT GUARDIAN",
+                text = "PRIVATE ON-DEVICE VISION GUARDIAN",
                 color = AegisPrimaryCyan,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 2.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 6.dp)
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.2.sp,
+                fontFamily = ClassicalBodyFont,
+                modifier = Modifier.padding(top = 10.dp)
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -144,10 +151,11 @@ fun SplashScreen(
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
-                    .width(180.dp)
-                    .height(3.dp),
-                color = AegisPrimaryCyan,
-                trackColor = AegisPrimaryCyan.copy(alpha = 0.2f),
+                    .width(200.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = AegisElectricBlue,
+                trackColor = AegisPrimaryCyan.copy(alpha = 0.14f),
                 strokeCap = StrokeCap.Round
             )
 

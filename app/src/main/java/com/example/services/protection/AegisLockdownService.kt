@@ -15,13 +15,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
-import com.example.blocking.overlay.SystemOverlayController
 import com.example.di.AegisContainer
 
 class AegisLockdownService : Service() {
 
     private val container by lazy { AegisContainer.getInstance(this) }
-    private val overlayController by lazy { SystemOverlayController(this) }
+    private val overlayController get() = container.overlayController
     private val watchdogHandler = Handler(Looper.getMainLooper())
 
     private val watchdogRunnable = object : Runnable {
@@ -30,6 +29,9 @@ class AegisLockdownService : Service() {
                 overlayController.showLockdownOverlay(container.preferences.lockdownIncidentInfo.value)
                 watchdogHandler.postDelayed(this, 2000L)
             } else {
+                overlayController.dismissBlockOverlay()
+                @Suppress("DEPRECATION")
+                stopForeground(true)
                 stopSelf()
             }
         }
@@ -68,7 +70,9 @@ class AegisLockdownService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         watchdogHandler.removeCallbacks(watchdogRunnable)
-        overlayController.dismissBlockOverlay()
+        if (!container.preferences.isLockdownActive()) {
+            overlayController.dismissBlockOverlay()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -77,10 +81,10 @@ class AegisLockdownService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Aegis Shield Device Lockdown",
+                "Sheildlenz Device Lockdown",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Enforces active Aegis Shield device lockdown timer across restarts"
+                description = "Enforces active Sheildlenz device lockdown timer across restarts"
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
@@ -101,7 +105,7 @@ class AegisLockdownService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Aegis Shield Lockdown Active")
+            .setContentTitle("Sheildlenz Lockdown Active")
             .setContentText("Device locked due to detected content violation")
             .setContentIntent(pi)
             .setOngoing(true)

@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,10 +30,10 @@ import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
-import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisWarningAmber
+import com.example.ui.theme.ClassicalBodyFont
 
 @Composable
 fun StatusPill(
@@ -46,7 +45,7 @@ fun StatusPill(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "PillPulse")
     val dotAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
+        initialValue = 0.45f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
@@ -59,26 +58,34 @@ fun StatusPill(
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(color.copy(alpha = 0.12f))
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.10f))
+            .border(1.dp, color.copy(alpha = 0.30f), RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(12.dp)
                 .clip(CircleShape)
-                .background(if (isActive) color.copy(alpha = dotAlpha) else color)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
+                .background(color.copy(alpha = if (isActive) 0.22f * dotAlpha else 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(if (isActive) color.copy(alpha = dotAlpha) else color)
+            )
+        }
+        Spacer(modifier = Modifier.width(7.dp))
         Text(
             text = label.uppercase(),
             color = color,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 0.8.sp,
-            fontFamily = FontFamily.Monospace
+            letterSpacing = 0.9.sp,
+            fontFamily = ClassicalBodyFont
         )
     }
 }
@@ -98,14 +105,15 @@ fun ThreatCategoryBadge(
     Text(
         text = text,
         color = color,
-        fontSize = 11.sp,
+        fontSize = 10.sp,
         fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = ClassicalBodyFont,
+        letterSpacing = 0.7.sp,
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.15f))
-            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.11f))
+            .border(1.dp, color.copy(alpha = 0.32f), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
     )
 }
 
@@ -116,7 +124,7 @@ fun SeverityTag(
 ) {
     val color = when (severity) {
         ThreatSeverity.CRITICAL -> AegisDangerRed
-        ThreatSeverity.HIGH -> Color(0xFFFF6D00)
+        ThreatSeverity.HIGH -> Color(0xFFEA580C)
         ThreatSeverity.MEDIUM -> AegisWarningAmber
         ThreatSeverity.LOW -> AegisElectricBlue
     }
@@ -125,10 +133,13 @@ fun SeverityTag(
         text = severity.name,
         color = color,
         fontSize = 10.sp,
-        fontWeight = FontWeight.ExtraBold,
+        fontWeight = FontWeight.Bold,
+        fontFamily = ClassicalBodyFont,
+        letterSpacing = 0.6.sp,
         modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.11f))
+            .border(1.dp, color.copy(alpha = 0.26f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
     )
 }

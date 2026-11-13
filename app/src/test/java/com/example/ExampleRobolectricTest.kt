@@ -34,10 +34,11 @@ import org.robolectric.shadows.ShadowSettings
 class ExampleRobolectricTest {
 
     @Test
-    fun `read string from context validates Aegis Shield app name`() {
+    fun `read string from context validates Sheildlenz app name and package`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("Aegis Shield", appName)
+        assertEquals("Sheildlenz", appName)
+        assertEquals("com.ahsan.tcr.sheildlenz", context.packageName)
     }
 
     @Test
@@ -375,5 +376,117 @@ class ExampleRobolectricTest {
         val receiver = AegisDeviceAdminReceiver()
         val msg = receiver.onDisableRequested(context, android.content.Intent())
         assertTrue(msg.toString().contains("Guardian Password", ignoreCase = true))
+    }
+
+    @Test
+    fun `lockdown completes stage 1 awaiting master code or escalates to double time and keeps shield active after both`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.clearLockdown()
+        prefs.setShieldDesiredActive(false)
+        prefs.setLockdownHours(10)
+        prefs.setWaitCooldownBeforePassword(true)
+        prefs.setGuardianPin("7890")
+
+        // Stage 1 begins
+        prefs.engageFullDeviceLockdown(
+            appName = "Browser",
+            packageName = "com.android.chrome",
+            categoryName = "Explicit Adult Content",
+            details = "Explicit detected"
+        )
+        assertEquals(AegisPreferences.LOCKDOWN_STAGE_INITIAL, prefs.lockdownStage.value)
+        assertTrue(prefs.isShieldDesiredActive.value)
+        assertFalse(prefs.canAcceptPasswordForLockdown())
+
+        // Simulate Stage 1 timer completion (00:00:00)
+        prefs.setLockdownUntilForTesting(System.currentTimeMillis() - 1_000L)
+        assertTrue(prefs.isLockdownActive()) // Still locked until Master Code OR Double-Time wait
+        assertTrue(prefs.canAcceptPasswordForLockdown())
+
+        // Path A: User does NOT know Master Code -> escalate to Double Time (20h)
+        val doubleUntil = prefs.engageDoubleTimeLockdown()
+        assertEquals(AegisPreferences.LOCKDOWN_STAGE_DOUBLE_TIME, prefs.lockdownStage.value)
+        assertTrue(prefs.isInDoubleTimeStage())
+        assertTrue(doubleUntil > System.currentTimeMillis() + 19 * 60 * 60 * 1000L)
+        assertTrue(prefs.isLockdownActive())
+        assertEquals(20, prefs.getDoubleTimeHours())
+
+        // Simulate Double-Time completion (00:00:00) -> auto-unlocks AND Shield remains ON
+        prefs.setLockdownUntilForTesting(System.currentTimeMillis() - 1_000L)
+        assertTrue(prefs.completeDoubleTimeIfExpired())
+        assertFalse(prefs.isLockdownActive())
+        assertEquals(AegisPreferences.LOCKDOWN_STAGE_NONE, prefs.lockdownStage.value)
+        assertTrue(prefs.isShieldDesiredActive.value)
+
+        // Path B: Unlock with Master Code -> clears lockdown AND Shield remains ON
+        prefs.engageFullDeviceLockdown(
+            appName = "Browser",
+            packageName = "com.android.chrome",
+            categoryName = "Suggestive",
+            details = "Suggestive detected"
+        )
+        prefs.setLockdownUntilForTesting(System.currentTimeMillis() - 1_000L)
+        assertTrue(prefs.verifyGuardianPin("7890"))
+        prefs.clearLockdown()
+        assertFalse(prefs.isLockdownActive())
+        assertTrue(prefs.isShieldDesiredActive.value)
+    }
+
+    @Test
+    fun `advanced precision lab supports exact minute specificity, double-time multiplier, and reset`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.clearLockdown()
+        prefs.resetAdvancedCustomizations()
+
+        assertFalse(prefs.advancedOptionsUnlocked.value)
+        prefs.setAdvancedOptionsUnlocked(true)
+        assertTrue(prefs.advancedOptionsUnlocked.value)
+
+        // Exact minute-level lockdown: 15 minutes with 3x double-time multiplier = 45m
+        prefs.setLockdownDurationMinutes(15)
+        prefs.setDoubleTimeMultiplier(3.0f)
+        assertEquals(15, prefs.lockdownDurationMinutes.value)
+        assertEquals(45, prefs.getDoubleTimeDurationMinutes())
+        assertEquals("15m", AegisPreferences.formatMinutesLabel(15))
+        assertEquals("2h 30m", AegisPreferences.formatMinutesLabel(150))
+
+        val untilStage1 = prefs.engageFullDeviceLockdown("VLC", "org.videolan.vlc", "Suggestive", "Custom timer test")
+        val remainingStage1 = untilStage1 - System.currentTimeMillis()
+        assertTrue(remainingStage1 in (14 * 60_000L)..(15 * 60_000L + 5_000L))
+
+        val untilDouble = prefs.engageDoubleTimeLockdown()
+        val remainingDouble = untilDouble - System.currentTimeMillis()
+        assertTrue(remainingDouble in (44 * 60_000L)..(45 * 60_000L + 5_000L))
+
+        prefs.clearLockdown()
+        prefs.resetAdvancedCustomizations()
+        assertEquals(600, prefs.lockdownDurationMinutes.value)
+        assertEquals(2.0f, prefs.doubleTimeMultiplier.value)
+        assertEquals(300, prefs.scanIntervalMs.value)
+    }
+
+    @Test
+    fun `decision engine honors custom explicit threshold and consecutive frame count overrides`() {
+        val engine = ThreatDecisionEngine()
+        val borderlineSuggestive = ClassificationResult(
+            safeScore = 0.25f,
+            suggestiveScore = 0.72f,
+            explicitScore = 0.03f,
+            topCategory = ThreatCategory.SUGGESTIVE_CONTENT,
+            confidence = 0.72f,
+            isModelLoaded = true,
+            latencyMs = 10L,
+            diagnosticInfo = "Custom threshold test"
+        )
+
+        // Custom suggestive threshold 0.70f + 3 consecutive frames required
+        val f1 = engine.evaluate(borderlineSuggestive, SensitivityLevel.BALANCED, false, 0.75f, 0.70f, 3)
+        val f2 = engine.evaluate(borderlineSuggestive, SensitivityLevel.BALANCED, false, 0.75f, 0.70f, 3)
+        val f3 = engine.evaluate(borderlineSuggestive, SensitivityLevel.BALANCED, false, 0.75f, 0.70f, 3)
+        assertFalse(f1.shouldBlock)
+        assertFalse(f2.shouldBlock)
+        assertTrue(f3.shouldBlock)
     }
 }

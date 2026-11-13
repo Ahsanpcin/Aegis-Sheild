@@ -25,15 +25,20 @@ class ThreatDecisionEngine {
     fun evaluate(
         result: ClassificationResult,
         sensitivity: SensitivityLevel,
-        isStrictEverything: Boolean
+        isStrictEverything: Boolean,
+        explicitThresholdOverride: Float? = null,
+        suggestiveThresholdOverride: Float? = null,
+        consecutiveFramesRequired: Int = 2
     ): DecisionOutcome {
-        val threshold = sensitivity.threshold
+        val explicitThreshold = explicitThresholdOverride ?: sensitivity.threshold
+        val suggestiveThreshold = suggestiveThresholdOverride ?: sensitivity.threshold
+        val requiredFrames = consecutiveFramesRequired.coerceIn(1, 5)
         val explicit = result.explicitScore
         val suggestive = result.suggestiveScore
         val safe = result.safeScore
 
         // 1. Explicit Adult Content: Immediate critical threat
-        if (explicit >= threshold || (isStrictEverything && explicit >= 0.50f)) {
+        if (explicit >= explicitThreshold || (isStrictEverything && explicit >= 0.50f)) {
             consecutiveSuspiciousCount = 0
             return DecisionOutcome(
                 shouldBlock = true,
@@ -45,9 +50,9 @@ class ThreatDecisionEngine {
         }
 
         // 2. Suggestive Adult / Provocative Content:
-        if (suggestive >= threshold || (isStrictEverything && suggestive >= 0.55f)) {
-            if (isStrictEverything || suggestive >= 0.85f) {
-                // High confidence suggestive or Strict Everything enabled
+        if (suggestive >= suggestiveThreshold || (isStrictEverything && suggestive >= 0.55f)) {
+            if (isStrictEverything || suggestive >= 0.85f || requiredFrames <= 1) {
+                // High confidence suggestive, Strict Everything enabled, or 1-frame immediate confirmation
                 consecutiveSuspiciousCount = 0
                 return DecisionOutcome(
                     shouldBlock = true,
@@ -57,16 +62,16 @@ class ThreatDecisionEngine {
                     reason = "Suggestive visual content identified with ${(suggestive * 100).toInt()}% confidence"
                 )
             } else {
-                // Borderline suggestive: require consecutive frame confirmation
+                // Borderline suggestive: require configured consecutive frame confirmation
                 consecutiveSuspiciousCount++
-                if (consecutiveSuspiciousCount >= 2) {
+                if (consecutiveSuspiciousCount >= requiredFrames) {
                     consecutiveSuspiciousCount = 0
                     return DecisionOutcome(
                         shouldBlock = true,
                         category = ThreatCategory.SUGGESTIVE_CONTENT,
                         severity = ThreatSeverity.MEDIUM,
                         confidence = suggestive,
-                        reason = "Consecutive suggestive frames confirmed policy violation"
+                        reason = "Consecutive suggestive frames ($requiredFrames) confirmed policy violation"
                     )
                 }
             }

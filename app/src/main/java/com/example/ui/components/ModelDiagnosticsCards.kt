@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -29,6 +27,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
@@ -63,14 +62,15 @@ import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
+import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
-import com.example.ui.theme.AegisVoidBackground
 import com.example.ui.theme.AegisWarningAmber
+import com.example.ui.theme.ClassicalBodyFont
+import com.example.ui.theme.ClassicalDisplayFont
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -112,48 +112,51 @@ fun ModelManagerCard(
     }
 
     val errorToShow = localError ?: telemetry.modelErrorMessage
-    val borderColor = when {
-        errorToShow != null -> AegisDangerRed.copy(alpha = 0.45f)
-        telemetry.isModelLoaded -> AegisSuccessGreen.copy(alpha = 0.45f)
-        else -> AegisWarningAmber.copy(alpha = 0.45f)
+    val accent = when {
+        errorToShow != null -> AegisDangerRed
+        telemetry.isModelLoaded -> AegisSuccessGreen
+        else -> AegisWarningAmber
     }
 
-    CyberCard(modifier = modifier, borderColor = borderColor) {
+    CyberCard(modifier = modifier, borderColor = accent.copy(alpha = 0.35f)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(
-                            (if (telemetry.isModelLoaded) AegisSuccessGreen else AegisWarningAmber).copy(alpha = 0.15f)
-                        ),
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(accent.copy(alpha = 0.12f))
+                        .border(1.dp, accent.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Memory,
                         contentDescription = null,
-                        tint = if (telemetry.isModelLoaded) AegisSuccessGreen else AegisWarningAmber,
-                        modifier = Modifier.size(18.dp)
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "AI MODEL ENGINE (.TFLITE)",
+                        text = "AI Model Engine (.tflite)",
                         color = AegisTextPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = ClassicalDisplayFont
                     )
                     Text(
                         text = telemetry.loadedModelName ?: "No model file attached",
                         color = if (telemetry.isModelLoaded) AegisPrimaryCyan else AegisTextMuted,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        fontFamily = ClassicalBodyFont
                     )
                 }
             }
@@ -170,25 +173,36 @@ fun ModelManagerCard(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (telemetry.isModelLoaded) {
-            ModelMetaRow("Input Tensor", telemetry.modelInputSpec)
-            ModelMetaRow(
-                "Class Mapping",
-                when (telemetry.modelOutputClasses) {
-                    2 -> "2-Class (Safe / NSFW)"
-                    3 -> "3-Class (Safe / Suggestive / Explicit)"
-                    5 -> "5-Class (Drawings / Hentai / Neutral / Porn / Sexy)"
-                    else -> "${telemetry.modelOutputClasses}-Class"
-                }
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AegisSurfaceElevated)
+                    .border(1.dp, AegisCardBorder, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                ModelMetaRow("Input Tensor", telemetry.modelInputSpec)
+                HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 4.dp))
+                ModelMetaRow(
+                    "Class Mapping",
+                    when (telemetry.modelOutputClasses) {
+                        2 -> "2-Class (Safe / NSFW)"
+                        3 -> "3-Class (Safe / Suggestive / Explicit)"
+                        5 -> "5-Class (NSFW MobileNet)"
+                        else -> "${telemetry.modelOutputClasses}-Class"
+                    }
+                )
+            }
         } else {
             Text(
                 text = "Select a compatible .tflite visual classifier from your phone storage. Supports 2-class, 3-class, and 5-class (MobileNet/Inception NSFW) Float32 or UInt8 models.",
                 color = AegisTextSecondary,
-                fontSize = 12.sp,
-                lineHeight = 17.sp
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                fontFamily = ClassicalBodyFont
             )
         }
 
@@ -196,11 +210,11 @@ fun ModelManagerCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(AegisDangerRed.copy(alpha = 0.12f))
-                    .border(1.dp, AegisDangerRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                    .padding(10.dp)
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AegisDangerRed.copy(alpha = 0.08f))
+                    .border(1.dp, AegisDangerRed.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
@@ -213,8 +227,8 @@ fun ModelManagerCard(
                     Text(
                         text = errorToShow ?: "",
                         color = AegisDangerRed,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
                     )
                 }
             }
@@ -233,7 +247,7 @@ fun ModelManagerCard(
                     containerColor = AegisPrimaryCyan,
                     contentColor = AegisOnPrimaryWhite
                 ),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
@@ -246,15 +260,22 @@ fun ModelManagerCard(
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("VALIDATING...", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = "VALIDATING...",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont,
+                        letterSpacing = 0.8.sp
+                    )
                 } else {
                     Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (telemetry.isModelLoaded) "REPLACE .TFLITE" else "LOAD .TFLITE FROM PHONE",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = ClassicalBodyFont,
+                        letterSpacing = 0.6.sp
                     )
                 }
             }
@@ -266,7 +287,7 @@ fun ModelManagerCard(
                         localError = null
                         onModelUpdated()
                     },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisDangerRed),
                     modifier = Modifier
                         .height(48.dp)
@@ -321,7 +342,7 @@ fun SampleImageTesterCard(
         }
     }
 
-    CyberCard(modifier = modifier, borderColor = AegisElectricBlue.copy(alpha = 0.35f)) {
+    CyberCard(modifier = modifier, borderColor = AegisElectricBlue.copy(alpha = 0.30f)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -330,31 +351,33 @@ fun SampleImageTesterCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(AegisElectricBlue.copy(alpha = 0.15f)),
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AegisElectricBlue.copy(alpha = 0.12f))
+                        .border(1.dp, AegisElectricBlue.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.ImageSearch,
                         contentDescription = null,
                         tint = AegisElectricBlue,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "SAMPLE IMAGE TESTER",
+                        text = "Sample Image Tester",
                         color = AegisTextPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = ClassicalDisplayFont
                     )
                     Text(
                         text = "Verify live TFLite inference on a photo",
                         color = AegisTextMuted,
-                        fontSize = 11.sp
+                        fontSize = 12.sp,
+                        fontFamily = ClassicalBodyFont
                     )
                 }
             }
@@ -363,13 +386,14 @@ fun SampleImageTesterCard(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "Pick any gallery photo using Android's zero-permission Photo Picker to test inference latency, class probabilities, and block decisions offline.",
+            text = "Pick any gallery photo using Android's zero-permission Photo Picker to inspect inference latency, class probabilities, and block decisions offline.",
             color = AegisTextSecondary,
-            fontSize = 12.sp,
-            lineHeight = 17.sp
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+            fontFamily = ClassicalBodyFont
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Button(
             onClick = {
@@ -381,32 +405,33 @@ fun SampleImageTesterCard(
             colors = ButtonDefaults.buttonColors(
                 containerColor = AegisSecondaryBackground,
                 contentColor = AegisElectricBlue,
-                disabledContainerColor = AegisSecondaryBackground.copy(alpha = 0.5f),
+                disabledContainerColor = AegisSecondaryBackground.copy(alpha = 0.55f),
                 disabledContentColor = AegisTextMuted
             ),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(14.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
                 .border(
                     1.dp,
-                    if (telemetry.isModelLoaded) AegisElectricBlue.copy(alpha = 0.5f) else AegisCardBorder,
-                    RoundedCornerShape(10.dp)
+                    if (telemetry.isModelLoaded) AegisElectricBlue.copy(alpha = 0.45f) else AegisCardBorder,
+                    RoundedCornerShape(14.dp)
                 )
                 .testTag("test_sample_image_button")
         ) {
             if (isTesting) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisElectricBlue, strokeWidth = 2.dp)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("RUNNING INFERENCE...", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Text("RUNNING INFERENCE...", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
             } else {
                 Icon(imageVector = Icons.Default.ImageSearch, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (telemetry.isModelLoaded) "PICK IMAGE & RUN MODEL TEST" else "LOAD A .TFLITE MODEL FIRST",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = ClassicalBodyFont,
+                    letterSpacing = 0.6.sp
                 )
             }
         }
@@ -415,7 +440,7 @@ fun SampleImageTesterCard(
             Text(
                 text = testError ?: "",
                 color = AegisDangerRed,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
@@ -426,10 +451,10 @@ fun SampleImageTesterCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 14.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AegisVoidBackground)
-                        .border(1.dp, AegisCardBorder, RoundedCornerShape(12.dp))
-                        .padding(12.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AegisSurfaceElevated)
+                        .border(1.dp, AegisCardBorder, RoundedCornerShape(16.dp))
+                        .padding(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -441,9 +466,9 @@ fun SampleImageTesterCard(
                             contentDescription = "Sample test thumbnail",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(68.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, AegisCardBorder, RoundedCornerShape(8.dp))
+                                .size(70.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, AegisCardBorder, RoundedCornerShape(12.dp))
                         )
 
                         Column(modifier = Modifier.weight(1f)) {
@@ -462,7 +487,7 @@ fun SampleImageTesterCard(
                             Text(
                                 text = result.decision.reason,
                                 color = AegisTextMuted,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }
@@ -475,7 +500,7 @@ fun SampleImageTesterCard(
                     ScoreProgressBar("Explicit", result.classification.explicitScore, AegisDangerRed)
 
                     if (result.classification.rawClassScores.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         val rawSummary = result.classification.rawClassScores.entries.joinToString(" • ") { (k, v) ->
                             "$k: ${(v * 100).toInt()}%"
                         }
@@ -500,11 +525,11 @@ private fun ModelMetaRow(label: String, value: String) {
             .padding(vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = AegisTextSecondary, fontSize = 11.sp)
+        Text(text = label, color = AegisTextSecondary, fontSize = 12.sp, fontFamily = ClassicalBodyFont)
         Text(
             text = value,
             color = AegisTextPrimary,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold
         )
@@ -513,29 +538,29 @@ private fun ModelMetaRow(label: String, value: String) {
 
 @Composable
 private fun ScoreProgressBar(label: String, score: Float, color: Color) {
-    Column(modifier = Modifier.padding(vertical = 3.dp)) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = label, color = AegisTextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            Text(text = label, color = AegisTextSecondary, fontSize = 12.sp, fontFamily = ClassicalBodyFont, fontWeight = FontWeight.Medium)
             Text(
                 text = "${(score * 100).toInt()}%",
                 color = color,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
         }
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         LinearProgressIndicator(
             progress = { score.coerceIn(0f, 1f) },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
+                .height(7.dp)
+                .clip(RoundedCornerShape(4.dp)),
             color = color,
-            trackColor = color.copy(alpha = 0.15f),
+            trackColor = color.copy(alpha = 0.14f),
             strokeCap = StrokeCap.Round
         )
     }

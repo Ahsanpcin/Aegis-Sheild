@@ -3,6 +3,7 @@ package com.example.data.preferences
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.SystemClock
+import androidx.annotation.VisibleForTesting
 import com.example.core.models.SensitivityLevel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +57,12 @@ class AegisPreferences(context: Context) {
     private val _lockdownPendingUnlock = MutableStateFlow(prefs.getBoolean(KEY_LOCKDOWN_PENDING_UNLOCK, false))
     val lockdownPendingUnlock: StateFlow<Boolean> = _lockdownPendingUnlock.asStateFlow()
 
+    private val _lockdownStage = MutableStateFlow(prefs.getInt(KEY_LOCKDOWN_STAGE, inferInitialStage()))
+    val lockdownStage: StateFlow<Int> = _lockdownStage.asStateFlow()
+
+    private val _isShieldDesiredActive = MutableStateFlow(prefs.getBoolean(KEY_SHIELD_DESIRED_ACTIVE, false))
+    val isShieldDesiredActive: StateFlow<Boolean> = _isShieldDesiredActive.asStateFlow()
+
     private val _lockdownIncidentInfo = MutableStateFlow(readLockdownIncident())
     val lockdownIncidentInfo: StateFlow<LockdownIncidentInfo> = _lockdownIncidentInfo.asStateFlow()
 
@@ -64,6 +71,51 @@ class AegisPreferences(context: Context) {
 
     private val _antiTamperEnabled = MutableStateFlow(prefs.getBoolean(KEY_ANTI_TAMPER_ENABLED, true))
     val antiTamperEnabled: StateFlow<Boolean> = _antiTamperEnabled.asStateFlow()
+
+    // 7-Tap Hidden Advanced Precision Lab Preferences
+    private val _advancedOptionsUnlocked = MutableStateFlow(prefs.getBoolean(KEY_ADVANCED_UNLOCKED, false))
+    val advancedOptionsUnlocked: StateFlow<Boolean> = _advancedOptionsUnlocked.asStateFlow()
+
+    private val _lockdownDurationMinutes = MutableStateFlow(
+        prefs.getInt(
+            KEY_LOCKDOWN_MINUTES,
+            prefs.getInt(KEY_LOCKDOWN_HOURS, DEFAULT_LOCKDOWN_HOURS) * 60
+        ).coerceIn(1, MAX_LOCKDOWN_MINUTES)
+    )
+    val lockdownDurationMinutes: StateFlow<Int> = _lockdownDurationMinutes.asStateFlow()
+
+    private val _doubleTimeMultiplier = MutableStateFlow(prefs.getFloat(KEY_DOUBLE_TIME_MULTIPLIER, 2.0f))
+    val doubleTimeMultiplier: StateFlow<Float> = _doubleTimeMultiplier.asStateFlow()
+
+    private val _scanIntervalMs = MutableStateFlow(prefs.getInt(KEY_SCAN_INTERVAL_MS, 300).coerceIn(100, 2000))
+    val scanIntervalMs: StateFlow<Int> = _scanIntervalMs.asStateFlow()
+
+    private val _captureWidthPx = MutableStateFlow(prefs.getInt(KEY_CAPTURE_WIDTH_PX, 480).coerceIn(240, 1080))
+    val captureWidthPx: StateFlow<Int> = _captureWidthPx.asStateFlow()
+
+    private val _skipDuplicateFrames = MutableStateFlow(prefs.getBoolean(KEY_SKIP_DUPLICATE_FRAMES, true))
+    val skipDuplicateFrames: StateFlow<Boolean> = _skipDuplicateFrames.asStateFlow()
+
+    private val _customThresholdsEnabled = MutableStateFlow(prefs.getBoolean(KEY_CUSTOM_THRESHOLDS_ENABLED, false))
+    val customThresholdsEnabled: StateFlow<Boolean> = _customThresholdsEnabled.asStateFlow()
+
+    private val _customExplicitThreshold = MutableStateFlow(prefs.getFloat(KEY_CUSTOM_EXPLICIT_THRESHOLD, 0.75f).coerceIn(0.35f, 0.95f))
+    val customExplicitThreshold: StateFlow<Float> = _customExplicitThreshold.asStateFlow()
+
+    private val _customSuggestiveThreshold = MutableStateFlow(prefs.getFloat(KEY_CUSTOM_SUGGESTIVE_THRESHOLD, 0.80f).coerceIn(0.35f, 0.95f))
+    val customSuggestiveThreshold: StateFlow<Float> = _customSuggestiveThreshold.asStateFlow()
+
+    private val _consecutiveFramesRequired = MutableStateFlow(prefs.getInt(KEY_CONSECUTIVE_FRAMES_REQUIRED, 2).coerceIn(1, 5))
+    val consecutiveFramesRequired: StateFlow<Int> = _consecutiveFramesRequired.asStateFlow()
+
+    private val _showEmergencyDialerOnLockdown = MutableStateFlow(prefs.getBoolean(KEY_SHOW_EMERGENCY_DIALER, true))
+    val showEmergencyDialerOnLockdown: StateFlow<Boolean> = _showEmergencyDialerOnLockdown.asStateFlow()
+
+    private val _evictAppOnThreat = MutableStateFlow(prefs.getBoolean(KEY_EVICT_APP_ON_THREAT, true))
+    val evictAppOnThreat: StateFlow<Boolean> = _evictAppOnThreat.asStateFlow()
+
+    private val _guardianSettingsWindowMinutes = MutableStateFlow(prefs.getInt(KEY_GUARDIAN_WINDOW_MINUTES, 2).coerceIn(1, 15))
+    val guardianSettingsWindowMinutes: StateFlow<Int> = _guardianSettingsWindowMinutes.asStateFlow()
 
     // Session-scoped Guardian authorization (automatically resets when app leaves foreground)
     private val _isGuardianSessionUnlocked = MutableStateFlow(false)
@@ -81,6 +133,16 @@ class AegisPreferences(context: Context) {
             SensitivityLevel.valueOf(name ?: SensitivityLevel.BALANCED.name)
         } catch (_: Exception) {
             SensitivityLevel.BALANCED
+        }
+    }
+
+    private fun inferInitialStage(): Int {
+        val pending = prefs.getBoolean(KEY_LOCKDOWN_PENDING_UNLOCK, false)
+        val until = prefs.getLong(KEY_LOCKDOWN_UNTIL_MILLIS, 0L)
+        return if (pending || until > System.currentTimeMillis()) {
+            LOCKDOWN_STAGE_INITIAL
+        } else {
+            LOCKDOWN_STAGE_NONE
         }
     }
 
@@ -129,9 +191,107 @@ class AegisPreferences(context: Context) {
     }
 
     fun setLockdownHours(hours: Int) {
-        val clamped = hours.coerceIn(1, 24)
-        prefs.edit().putInt(KEY_LOCKDOWN_HOURS, clamped).apply()
-        _lockdownHours.value = clamped
+        val clampedHours = hours.coerceIn(1, 24)
+        val totalMinutes = clampedHours * 60
+        prefs.edit()
+            .putInt(KEY_LOCKDOWN_HOURS, clampedHours)
+            .putInt(KEY_LOCKDOWN_MINUTES, totalMinutes)
+            .apply()
+        _lockdownHours.value = clampedHours
+        _lockdownDurationMinutes.value = totalMinutes
+    }
+
+    fun setLockdownDurationMinutes(totalMinutes: Int) {
+        val clamped = totalMinutes.coerceIn(1, MAX_LOCKDOWN_MINUTES)
+        val wholeHours = (clamped / 60).coerceAtLeast(1)
+        prefs.edit()
+            .putInt(KEY_LOCKDOWN_MINUTES, clamped)
+            .putInt(KEY_LOCKDOWN_HOURS, wholeHours)
+            .apply()
+        _lockdownDurationMinutes.value = clamped
+        _lockdownHours.value = wholeHours
+    }
+
+    fun setAdvancedOptionsUnlocked(unlocked: Boolean) {
+        prefs.edit().putBoolean(KEY_ADVANCED_UNLOCKED, unlocked).apply()
+        _advancedOptionsUnlocked.value = unlocked
+    }
+
+    fun setDoubleTimeMultiplier(multiplier: Float) {
+        val clamped = multiplier.coerceIn(1.0f, 5.0f)
+        prefs.edit().putFloat(KEY_DOUBLE_TIME_MULTIPLIER, clamped).apply()
+        _doubleTimeMultiplier.value = clamped
+    }
+
+    fun setScanIntervalMs(intervalMs: Int) {
+        val clamped = intervalMs.coerceIn(100, 2000)
+        prefs.edit().putInt(KEY_SCAN_INTERVAL_MS, clamped).apply()
+        _scanIntervalMs.value = clamped
+    }
+
+    fun setCaptureWidthPx(widthPx: Int) {
+        val clamped = widthPx.coerceIn(240, 1080)
+        prefs.edit().putInt(KEY_CAPTURE_WIDTH_PX, clamped).apply()
+        _captureWidthPx.value = clamped
+    }
+
+    fun setSkipDuplicateFrames(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SKIP_DUPLICATE_FRAMES, enabled).apply()
+        _skipDuplicateFrames.value = enabled
+    }
+
+    fun setCustomThresholdsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_CUSTOM_THRESHOLDS_ENABLED, enabled).apply()
+        _customThresholdsEnabled.value = enabled
+    }
+
+    fun setCustomExplicitThreshold(threshold: Float) {
+        val clamped = threshold.coerceIn(0.35f, 0.95f)
+        prefs.edit().putFloat(KEY_CUSTOM_EXPLICIT_THRESHOLD, clamped).apply()
+        _customExplicitThreshold.value = clamped
+    }
+
+    fun setCustomSuggestiveThreshold(threshold: Float) {
+        val clamped = threshold.coerceIn(0.35f, 0.95f)
+        prefs.edit().putFloat(KEY_CUSTOM_SUGGESTIVE_THRESHOLD, clamped).apply()
+        _customSuggestiveThreshold.value = clamped
+    }
+
+    fun setConsecutiveFramesRequired(count: Int) {
+        val clamped = count.coerceIn(1, 5)
+        prefs.edit().putInt(KEY_CONSECUTIVE_FRAMES_REQUIRED, clamped).apply()
+        _consecutiveFramesRequired.value = clamped
+    }
+
+    fun setShowEmergencyDialerOnLockdown(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_EMERGENCY_DIALER, enabled).apply()
+        _showEmergencyDialerOnLockdown.value = enabled
+    }
+
+    fun setEvictAppOnThreat(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_EVICT_APP_ON_THREAT, enabled).apply()
+        _evictAppOnThreat.value = enabled
+    }
+
+    fun setGuardianSettingsWindowMinutes(minutes: Int) {
+        val clamped = minutes.coerceIn(1, 15)
+        prefs.edit().putInt(KEY_GUARDIAN_WINDOW_MINUTES, clamped).apply()
+        _guardianSettingsWindowMinutes.value = clamped
+    }
+
+    fun resetAdvancedCustomizations() {
+        setLockdownHours(DEFAULT_LOCKDOWN_HOURS)
+        setDoubleTimeMultiplier(2.0f)
+        setScanIntervalMs(300)
+        setCaptureWidthPx(480)
+        setSkipDuplicateFrames(true)
+        setCustomThresholdsEnabled(false)
+        setCustomExplicitThreshold(0.75f)
+        setCustomSuggestiveThreshold(0.80f)
+        setConsecutiveFramesRequired(2)
+        setShowEmergencyDialerOnLockdown(true)
+        setEvictAppOnThreat(true)
+        setGuardianSettingsWindowMinutes(2)
     }
 
     fun setWaitCooldownBeforePassword(enabled: Boolean) {
@@ -144,6 +304,18 @@ class AegisPreferences(context: Context) {
         _antiTamperEnabled.value = enabled
     }
 
+    fun setShieldDesiredActive(active: Boolean) {
+        prefs.edit().putBoolean(KEY_SHIELD_DESIRED_ACTIVE, active).apply()
+        _isShieldDesiredActive.value = active
+    }
+
+    fun getDoubleTimeDurationMinutes(): Int =
+        (_lockdownDurationMinutes.value * _doubleTimeMultiplier.value).toInt().coerceAtLeast(1)
+
+    fun getDoubleTimeHours(): Int = (getDoubleTimeDurationMinutes() / 60).coerceAtLeast(1)
+
+    fun isInDoubleTimeStage(): Boolean = _lockdownStage.value == LOCKDOWN_STAGE_DOUBLE_TIME
+
     fun engageFullDeviceLockdown(
         appName: String,
         packageName: String,
@@ -151,12 +323,14 @@ class AegisPreferences(context: Context) {
         details: String
     ): Long {
         val now = System.currentTimeMillis()
-        val durationMs = _lockdownHours.value * 60L * 60L * 1000L
+        val durationMs = _lockdownDurationMinutes.value * 60L * 1000L
         val until = now + durationMs
 
         prefs.edit()
             .putLong(KEY_LOCKDOWN_UNTIL_MILLIS, until)
             .putBoolean(KEY_LOCKDOWN_PENDING_UNLOCK, true)
+            .putInt(KEY_LOCKDOWN_STAGE, LOCKDOWN_STAGE_INITIAL)
+            .putBoolean(KEY_SHIELD_DESIRED_ACTIVE, true)
             .putString(KEY_LOCKDOWN_APP_NAME, appName)
             .putString(KEY_LOCKDOWN_PACKAGE, packageName)
             .putString(KEY_LOCKDOWN_CATEGORY, categoryName)
@@ -167,8 +341,35 @@ class AegisPreferences(context: Context) {
 
         _lockdownUntilMillis.value = until
         _lockdownPendingUnlock.value = true
+        _lockdownStage.value = LOCKDOWN_STAGE_INITIAL
+        _isShieldDesiredActive.value = true
         _lockdownIncidentInfo.value = LockdownIncidentInfo(appName, packageName, categoryName, details, now)
         _blockedOffendingPackage.value = packageName
+        return until
+    }
+
+    /**
+     * Stage 2 Double-Time Fallback:
+     * If the user does not know the Master Code after Stage 1 finishes, they can wait
+     * (lockdownDurationMinutes * doubleTimeMultiplier). When that double-time countdown finishes,
+     * the device automatically unlocks while keeping the Sheildlenz Shield ON.
+     */
+    fun engageDoubleTimeLockdown(): Long {
+        val now = System.currentTimeMillis()
+        val durationMs = getDoubleTimeDurationMinutes() * 60L * 1000L
+        val until = now + durationMs
+
+        prefs.edit()
+            .putLong(KEY_LOCKDOWN_UNTIL_MILLIS, until)
+            .putBoolean(KEY_LOCKDOWN_PENDING_UNLOCK, true)
+            .putInt(KEY_LOCKDOWN_STAGE, LOCKDOWN_STAGE_DOUBLE_TIME)
+            .putBoolean(KEY_SHIELD_DESIRED_ACTIVE, true)
+            .apply()
+
+        _lockdownUntilMillis.value = until
+        _lockdownPendingUnlock.value = true
+        _lockdownStage.value = LOCKDOWN_STAGE_DOUBLE_TIME
+        _isShieldDesiredActive.value = true
         return until
     }
 
@@ -178,11 +379,28 @@ class AegisPreferences(context: Context) {
         return (until - System.currentTimeMillis()).coerceAtLeast(0L)
     }
 
+    fun completeDoubleTimeIfExpired(): Boolean {
+        if (_lockdownStage.value == LOCKDOWN_STAGE_DOUBLE_TIME && getRemainingLockdownMillis() <= 0L) {
+            clearLockdown()
+            return true
+        }
+        return false
+    }
+
     fun isLockdownActive(): Boolean {
+        if (_lockdownStage.value == LOCKDOWN_STAGE_DOUBLE_TIME) {
+            return if (getRemainingLockdownMillis() > 0L) {
+                true
+            } else {
+                clearLockdown()
+                false
+            }
+        }
         return _lockdownPendingUnlock.value || getRemainingLockdownMillis() > 0L
     }
 
     fun canAcceptPasswordForLockdown(): Boolean {
+        if (_lockdownStage.value == LOCKDOWN_STAGE_DOUBLE_TIME) return true
         if (!_waitCooldownBeforePassword.value) return true
         return getRemainingLockdownMillis() <= 0L
     }
@@ -191,11 +409,19 @@ class AegisPreferences(context: Context) {
         prefs.edit()
             .putLong(KEY_LOCKDOWN_UNTIL_MILLIS, 0L)
             .putBoolean(KEY_LOCKDOWN_PENDING_UNLOCK, false)
+            .putInt(KEY_LOCKDOWN_STAGE, LOCKDOWN_STAGE_NONE)
             .remove(KEY_BLOCKED_PACKAGE)
             .apply()
         _lockdownUntilMillis.value = 0L
         _lockdownPendingUnlock.value = false
+        _lockdownStage.value = LOCKDOWN_STAGE_NONE
         _blockedOffendingPackage.value = null
+    }
+
+    @VisibleForTesting
+    internal fun setLockdownUntilForTesting(untilMillis: Long) {
+        prefs.edit().putLong(KEY_LOCKDOWN_UNTIL_MILLIS, untilMillis).apply()
+        _lockdownUntilMillis.value = untilMillis
     }
 
     fun setBlockedOffendingPackage(packageName: String?) {
@@ -207,7 +433,7 @@ class AegisPreferences(context: Context) {
         _blockedOffendingPackage.value = packageName
     }
 
-    fun unlockGuardianSession(grantSettingsWindowMinutes: Int = 2) {
+    fun unlockGuardianSession(grantSettingsWindowMinutes: Int = _guardianSettingsWindowMinutes.value) {
         _isGuardianSessionUnlocked.value = true
         guardianSettingsBypassUntilRealtime =
             SystemClock.elapsedRealtime() + (grantSettingsWindowMinutes * 60_000L)
@@ -228,7 +454,7 @@ class AegisPreferences(context: Context) {
         }
     }
 
-    fun grantTemporarySettingsAuthorization(minutes: Int = 2) {
+    fun grantTemporarySettingsAuthorization(minutes: Int = _guardianSettingsWindowMinutes.value) {
         explicitSettingsTripPending = true
         guardianSettingsBypassUntilRealtime =
             SystemClock.elapsedRealtime() + (minutes * 60_000L)
@@ -267,6 +493,21 @@ class AegisPreferences(context: Context) {
 
     companion object {
         const val DEFAULT_LOCKDOWN_HOURS = 10
+        const val MAX_LOCKDOWN_MINUTES = 24 * 60
+        const val LOCKDOWN_STAGE_NONE = 0
+        const val LOCKDOWN_STAGE_INITIAL = 1
+        const val LOCKDOWN_STAGE_DOUBLE_TIME = 2
+
+        fun formatMinutesLabel(totalMinutes: Int): String {
+            val safe = totalMinutes.coerceAtLeast(1)
+            val hrs = safe / 60
+            val mins = safe % 60
+            return when {
+                hrs == 0 -> "${mins}m"
+                mins == 0 -> "${hrs}h"
+                else -> "${hrs}h ${mins}m"
+            }
+        }
 
         private const val KEY_SENSITIVITY = "key_sensitivity"
         private const val KEY_STRICT_EVERYTHING = "key_strict_everything"
@@ -277,9 +518,12 @@ class AegisPreferences(context: Context) {
         private const val KEY_IMPORTED_MODEL_NAME = "key_imported_model_name"
 
         private const val KEY_LOCKDOWN_HOURS = "key_lockdown_hours"
+        private const val KEY_LOCKDOWN_MINUTES = "key_lockdown_minutes"
         private const val KEY_WAIT_COOLDOWN_BEFORE_PIN = "key_wait_cooldown_before_pin"
         private const val KEY_LOCKDOWN_UNTIL_MILLIS = "key_lockdown_until_millis"
         private const val KEY_LOCKDOWN_PENDING_UNLOCK = "key_lockdown_pending_unlock"
+        private const val KEY_LOCKDOWN_STAGE = "key_lockdown_stage"
+        private const val KEY_SHIELD_DESIRED_ACTIVE = "key_shield_desired_active"
         private const val KEY_LOCKDOWN_APP_NAME = "key_lockdown_app_name"
         private const val KEY_LOCKDOWN_PACKAGE = "key_lockdown_package"
         private const val KEY_LOCKDOWN_CATEGORY = "key_lockdown_category"
@@ -287,5 +531,18 @@ class AegisPreferences(context: Context) {
         private const val KEY_LOCKDOWN_DETECTED_AT = "key_lockdown_detected_at"
         private const val KEY_BLOCKED_PACKAGE = "key_blocked_package"
         private const val KEY_ANTI_TAMPER_ENABLED = "key_anti_tamper_enabled"
+
+        private const val KEY_ADVANCED_UNLOCKED = "key_advanced_lab_unlocked"
+        private const val KEY_DOUBLE_TIME_MULTIPLIER = "key_double_time_multiplier"
+        private const val KEY_SCAN_INTERVAL_MS = "key_scan_interval_ms"
+        private const val KEY_CAPTURE_WIDTH_PX = "key_capture_width_px"
+        private const val KEY_SKIP_DUPLICATE_FRAMES = "key_skip_duplicate_frames"
+        private const val KEY_CUSTOM_THRESHOLDS_ENABLED = "key_custom_thresholds_enabled"
+        private const val KEY_CUSTOM_EXPLICIT_THRESHOLD = "key_custom_explicit_threshold"
+        private const val KEY_CUSTOM_SUGGESTIVE_THRESHOLD = "key_custom_suggestive_threshold"
+        private const val KEY_CONSECUTIVE_FRAMES_REQUIRED = "key_consecutive_frames_required"
+        private const val KEY_SHOW_EMERGENCY_DIALER = "key_show_emergency_dialer"
+        private const val KEY_EVICT_APP_ON_THREAT = "key_evict_app_on_threat"
+        private const val KEY_GUARDIAN_WINDOW_MINUTES = "key_guardian_window_minutes"
     }
 }

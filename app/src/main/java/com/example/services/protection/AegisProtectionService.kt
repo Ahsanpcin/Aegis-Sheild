@@ -26,7 +26,6 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
-import com.example.blocking.overlay.SystemOverlayController
 import com.example.core.models.SecurityIncident
 import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
@@ -49,7 +48,7 @@ class AegisProtectionService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val container by lazy { AegisContainer.getInstance(this) }
-    private val overlayController by lazy { SystemOverlayController(this) }
+    private val overlayController get() = container.overlayController
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -62,7 +61,6 @@ class AegisProtectionService : Service() {
     private lateinit var decisionEngine: ThreatDecisionEngine
 
     private var lastInspectionTimeMs: Long = 0L
-    private val minInspectionIntervalMs: Long = 300L // ~3.3 FPS adaptive rate for optimal battery conservation
 
     private var frameCounter: Long = 0L
     private var fpsCounter: Int = 0
@@ -104,9 +102,9 @@ class AegisProtectionService : Service() {
                     decisionEngine.reset()
                     container.refreshModelTelemetry()
                     val statusLabel = if (reloaded) {
-                        "Aegis Shield Active • AI Guardian Armed"
+                        "Sheildlenz Active • AI Guardian Armed"
                     } else {
-                        "Aegis Screen Capture Active • Load .tflite Model"
+                        "Sheildlenz Capture Active • Load .tflite Model"
                     }
                     val nm = getSystemService(NotificationManager::class.java)
                     nm?.notify(NOTIFICATION_ID, buildForegroundNotification(statusLabel))
@@ -130,10 +128,11 @@ class AegisProtectionService : Service() {
                 }
 
                 if (resultCode != 0 && resultData != null) {
+                    container.preferences.setShieldDesiredActive(true)
                     val statusLabel = if (contentClassifier.isModelReady) {
-                        "Aegis Shield Active • AI Guardian Armed"
+                        "Sheildlenz Active • AI Guardian Armed"
                     } else {
-                        "Aegis Screen Capture Active • Load .tflite Model"
+                        "Sheildlenz Capture Active • Load .tflite Model"
                     }
                     val notification = buildForegroundNotification(statusLabel)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -182,9 +181,10 @@ class AegisProtectionService : Service() {
 
         val screenWidth = metrics.widthPixels
         val screenHeight = metrics.heightPixels
-        val scale = 480f / screenWidth.coerceAtLeast(1)
-        val captureWidth = 480
-        val captureHeight = (screenHeight * scale).toInt().coerceAtLeast(480)
+        val targetWidth = container.preferences.captureWidthPx.value.coerceIn(240, 1080)
+        val scale = targetWidth.toFloat() / screenWidth.coerceAtLeast(1)
+        val captureWidth = targetWidth
+        val captureHeight = (screenHeight * scale).toInt().coerceAtLeast(240)
         val densityDpi = metrics.densityDpi
 
         val reader = ImageReader.newInstance(captureWidth, captureHeight, PixelFormat.RGBA_8888, 2)
@@ -198,7 +198,8 @@ class AegisProtectionService : Service() {
             } ?: return@setOnImageAvailableListener
 
             val currentTime = SystemClock.uptimeMillis()
-            if (currentTime - lastInspectionTimeMs < minInspectionIntervalMs) {
+            val dynamicIntervalMs = container.preferences.scanIntervalMs.value.toLong().coerceIn(100L, 2000L)
+            if (currentTime - lastInspectionTimeMs < dynamicIntervalMs) {
                 image.close()
                 return@setOnImageAvailableListener
             }
@@ -229,7 +230,7 @@ class AegisProtectionService : Service() {
 
             if (bitmap == null) return
 
-            if (framePreprocessor.isFrameDuplicate(bitmap)) {
+            if (container.preferences.skipDuplicateFrames.value && framePreprocessor.isFrameDuplicate(bitmap)) {
                 bitmap.recycle()
                 return
             }
@@ -244,6 +245,12 @@ class AegisProtectionService : Service() {
                 container.protectionRepository.recordInspectionMetrics(frameCounter, currentFps)
                 fpsCounter = 0
                 lastFpsSampleTime = now
+            }
+
+            // Pause inference while our lockdown overlay covers the screen; Shield stays alive for instant resume on unlock
+            if (container.preferences.isLockdownActive() && overlayController.isOverlayVisible) {
+                bitmap.recycle()
+                return
             }
 
             // Do not attempt inference or fake results when no TFLite model is loaded
@@ -264,12 +271,24 @@ class AegisProtectionService : Service() {
             val classification = contentClassifier.classifyTensorBuffer(tensorBuffer)
             if (!classification.isModelLoaded) return
 
-            val sensitivity = container.preferences.sensitivity.value
-            val isStrictEverything = container.preferences.strictEverything.value
-            val isMaintenance = container.preferences.maintenanceMode.value
+            val prefs = container.preferences
+            val sensitivity = prefs.sensitivity.value
+            val isStrictEverything = prefs.strictEverything.value
+            val isMaintenance = prefs.maintenanceMode.value
+            val useCustomThresholds = prefs.customThresholdsEnabled.value
+            val explicitOverride = if (useCustomThresholds) prefs.customExplicitThreshold.value else null
+            val suggestiveOverride = if (useCustomThresholds) prefs.customSuggestiveThreshold.value else null
+            val consecutiveRequired = prefs.consecutiveFramesRequired.value
 
             if (!isMaintenance) {
-                val decision = decisionEngine.evaluate(classification, sensitivity, isStrictEverything)
+                val decision = decisionEngine.evaluate(
+                    result = classification,
+                    sensitivity = sensitivity,
+                    isStrictEverything = isStrictEverything,
+                    explicitThresholdOverride = explicitOverride,
+                    suggestiveThresholdOverride = suggestiveOverride,
+                    consecutiveFramesRequired = consecutiveRequired
+                )
                 if (decision.shouldBlock) {
                     handleThreatDetected(classification, decision)
                 }
@@ -291,11 +310,15 @@ class AegisProtectionService : Service() {
 
         Log.w(TAG, "THREAT CONFIRMED: ${decision.category.name} in $targetAppName ($targetPkg). Executing eviction & full-device lockdown.")
 
-        // 1. Close offending app from foreground/background and prevent Recents re-entry
-        AegisAccessibilityService.closeAndEvictPackage(this, targetPkg)
+        // 1. Close offending app from foreground/background and prevent Recents re-entry if enabled
+        if (container.preferences.evictAppOnThreat.value) {
+            AegisAccessibilityService.closeAndEvictPackage(this, targetPkg)
+        } else {
+            AegisAccessibilityService.performEmergencyHomeAction()
+        }
         val suspended = AegisDeviceAdminReceiver.suspendPackageIfDeviceOwner(this, targetPkg)
 
-        // 2. Engage persistent 10-hour full-device lockdown and tell everything that was detected
+        // 2. Engage persistent full-device lockdown and tell everything that was detected
         container.preferences.engageFullDeviceLockdown(
             appName = targetAppName,
             packageName = targetPkg,
@@ -305,11 +328,12 @@ class AegisProtectionService : Service() {
         AegisLockdownService.start(this)
         overlayController.showLockdownOverlay(container.preferences.lockdownIncidentInfo.value)
 
-        val hours = container.preferences.lockdownHours.value
+        val totalMinutes = container.preferences.lockdownDurationMinutes.value
+        val durationLabel = com.example.data.preferences.AegisPreferences.formatMinutesLabel(totalMinutes)
         val actionSummary = buildString {
-            append("App Evicted & Background Killed")
+            append(if (container.preferences.evictAppOnThreat.value) "App Evicted & Background Killed" else "Screen Shielded")
             if (suspended) append(" + Package Suspended")
-            append(" • ${hours}h Device Lock")
+            append(" • $durationLabel Device Lock")
         }
 
         serviceScope.launch {
@@ -322,7 +346,7 @@ class AegisProtectionService : Service() {
                 confidenceScore = decision.confidence,
                 actionTaken = actionSummary,
                 diagnosticSummary = fullDetails,
-                lockdownDurationMinutes = hours * 60
+                lockdownDurationMinutes = totalMinutes
             )
             container.securityHistoryRepository.logIncident(incident)
             container.protectionRepository.recordDetection(decision.category)
@@ -351,7 +375,9 @@ class AegisProtectionService : Service() {
         }
         mediaProjection = null
 
-        overlayController.dismissBlockOverlay()
+        if (!container.preferences.isLockdownActive()) {
+            overlayController.dismissBlockOverlay()
+        }
         contentClassifier.close()
         decisionEngine.reset()
         framePreprocessor.reset()
@@ -382,7 +408,7 @@ class AegisProtectionService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Aegis Shield Protection Monitor",
+                "Sheildlenz Protection Monitor",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Monitors screen frames for inappropriate content and provides protection status"
@@ -406,7 +432,7 @@ class AegisProtectionService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Aegis Shield")
+            .setContentTitle("Sheildlenz")
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

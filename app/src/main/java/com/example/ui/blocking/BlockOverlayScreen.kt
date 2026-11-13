@@ -1,6 +1,5 @@
 package com.example.ui.blocking
 
-import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -19,17 +18,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -60,18 +58,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.ThreatCategory
 import com.example.data.preferences.AegisPreferences
+import com.example.services.protection.AegisLockdownService
 import com.example.ui.components.AegisShieldGraphic
+import com.example.ui.components.CyberCard
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
+import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisRedGlow
-import com.example.ui.theme.AegisSecondaryBackground
+import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisVoidBackground
+import com.example.ui.theme.AegisWarningAmber
+import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 
 @Composable
@@ -82,18 +84,19 @@ fun BlockOverlayScreen(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val doubleTimeMinutes = remember(preferences) { preferences.getDoubleTimeDurationMinutes() }
+    val doubleTimeLabel = remember(doubleTimeMinutes) { AegisPreferences.formatMinutesLabel(doubleTimeMinutes) }
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
 
-    // Intercept hardware back button to prevent unauthorized dismissal without PIN
     BackHandler {
         showPinDialog = true
     }
 
     val pulseTransition = rememberInfiniteTransition(label = "WarningPulse")
     val pulseAlpha by pulseTransition.animateFloat(
-        initialValue = 0.5f,
+        initialValue = 0.55f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1000, easing = FastOutSlowInEasing),
@@ -109,11 +112,13 @@ fun BlockOverlayScreen(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         AegisVoidBackground,
-                        Color(0xFFFCEEEF),
+                        Color(0xFFFDF0F2),
                         AegisVoidBackground
                     )
                 )
             )
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .testTag("block_overlay_screen_root"),
         contentAlignment = Alignment.Center
     ) {
@@ -124,12 +129,11 @@ fun BlockOverlayScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Warning Badge
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(AegisDangerRed.copy(alpha = 0.15f * pulseAlpha))
-                    .border(1.dp, AegisDangerRed.copy(alpha = 0.8f * pulseAlpha), RoundedCornerShape(30.dp))
+                    .clip(RoundedCornerShape(50))
+                    .background(AegisDangerRed.copy(alpha = 0.12f * pulseAlpha))
+                    .border(1.dp, AegisDangerRed.copy(alpha = 0.70f * pulseAlpha), RoundedCornerShape(50))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -141,33 +145,31 @@ fun BlockOverlayScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "AEGIS INTERVENTION ACTIVE",
+                        text = "SHEILDLENZ INTERVENTION ACTIVE",
                         color = AegisDangerRed,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont,
                         letterSpacing = 1.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            // Pulsing Red Shield
             AegisShieldGraphic(
                 isProtected = true,
                 isThreatActive = true,
-                size = 170.dp
+                size = 172.dp
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "CONTENT BLOCKED",
+                text = "Content Blocked",
                 color = AegisTextPrimary,
-                fontSize = 26.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
                 fontFamily = ClassicalDisplayFont
             )
 
@@ -176,28 +178,21 @@ fun BlockOverlayScreen(
                 color = AegisDangerRed,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = ClassicalBodyFont,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // Incident Brief Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AegisCardBackground)
-                    .border(1.dp, AegisCardBorder, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.25f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Visual content matching ${category.displayName} was identified on the active display. The screen has been obscured to uphold protection policies.",
                         color = AegisTextSecondary,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         textAlign = TextAlign.Center,
-                        lineHeight = 17.sp
+                        lineHeight = 19.sp,
+                        fontFamily = ClassicalBodyFont
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -209,15 +204,24 @@ fun BlockOverlayScreen(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.SemiBold
                     )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "POLICY: Master Code or ${doubleTimeLabel.uppercase()} Double-Time Wait • Shield Remains ON",
+                        color = AegisSuccessGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Action 1: Close App / Go Home
             Button(
                 onClick = {
-                    // Send home intent to exit offending app
                     val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                         addCategory(Intent.CATEGORY_HOME)
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -233,7 +237,7 @@ fun BlockOverlayScreen(
                     containerColor = AegisDangerRed,
                     contentColor = AegisOnPrimaryWhite
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Icon(imageVector = Icons.Default.Home, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -241,14 +245,13 @@ fun BlockOverlayScreen(
                     text = "RETURN TO HOME SCREEN",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
+                    fontFamily = ClassicalBodyFont,
+                    letterSpacing = 0.8.sp
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action 2: Guardian PIN Override
             OutlinedButton(
                 onClick = {
                     pinInput = ""
@@ -262,40 +265,43 @@ fun BlockOverlayScreen(
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = AegisPrimaryCyan
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "GUARDIAN PIN OVERRIDE",
+                    text = "MASTER CODE OVERRIDE",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = ClassicalBodyFont,
+                    letterSpacing = 0.6.sp
                 )
             }
         }
 
-        // Guardian PIN Prompt
         if (showPinDialog) {
             AlertDialog(
                 onDismissRequest = { showPinDialog = false },
-                containerColor = AegisSecondaryBackground,
+                containerColor = AegisCardBackground,
                 titleContentColor = AegisTextPrimary,
-                title = { Text("Guardian Verification") },
+                title = { Text("Master Code Verification", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
                 text = {
                     Column {
                         Text(
-                            text = "Enter Guardian PIN to bypass this content block.",
+                            text = "Enter the Guardian Master Code to continue. If you do not know the Master Code, start a $doubleTimeLabel Double-Time Wait. Sheildlenz Shield remains ON after both.",
                             color = AegisTextSecondary,
-                            fontSize = 12.sp
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            fontFamily = ClassicalBodyFont
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = pinInput,
                             onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pinInput = it },
-                            label = { Text("PIN") },
+                            label = { Text("Master Code / PIN") },
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            shape = RoundedCornerShape(12.dp),
                             isError = pinError != null,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AegisPrimaryCyan,
@@ -309,8 +315,38 @@ fun BlockOverlayScreen(
                             Text(
                                 text = pinError!!,
                                 color = AegisDangerRed,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                preferences.engageFullDeviceLockdown(
+                                    appName = targetAppName,
+                                    packageName = "",
+                                    categoryName = category.displayName,
+                                    details = "Double-Time Wait ($doubleTimeLabel) selected because Master Code was unknown."
+                                )
+                                preferences.engageDoubleTimeLockdown()
+                                AegisLockdownService.start(context)
+                                showPinDialog = false
+                                onDismiss()
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AegisChampagneGold.copy(alpha = 0.12f),
+                                contentColor = AegisWarningAmber
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("block_screen_double_time_button")
+                        ) {
+                            Text(
+                                text = "DON'T KNOW CODE? WAIT DOUBLE TIME (${doubleTimeLabel.uppercase()})",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -319,10 +355,12 @@ fun BlockOverlayScreen(
                     Button(
                         onClick = {
                             if (preferences.verifyGuardianPin(pinInput)) {
+                                preferences.clearLockdown()
+                                preferences.setShieldDesiredActive(true)
                                 showPinDialog = false
                                 onDismiss()
                             } else {
-                                pinError = "Incorrect Guardian PIN"
+                                pinError = "Incorrect Master Code. Use Double-Time Wait if unknown."
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -330,7 +368,7 @@ fun BlockOverlayScreen(
                             contentColor = AegisOnPrimaryWhite
                         )
                     ) {
-                        Text("VERIFY & UNBLOCK", fontWeight = FontWeight.Bold)
+                        Text("VERIFY (SHIELD ON)", fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {

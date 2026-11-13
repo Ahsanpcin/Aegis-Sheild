@@ -1,5 +1,5 @@
 {
-  "name": "Aegis Shield",
+  "name": "Sheildlenz",
   "description": "AI-powered on-device content protection and visual shield for Android.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

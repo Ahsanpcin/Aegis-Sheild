@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Aegis Shield"
+rootProject.name = "Sheildlenz"
 
 include(":app")
