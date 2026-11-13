@@ -105,6 +105,7 @@ fun SettingsScreen(
 
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
+    var confirmPinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
 
     var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
@@ -183,14 +184,9 @@ fun SettingsScreen(
 
                             Button(
                                 onClick = {
-                                    if (hasPin) {
-                                        masterKeyGate.request("change Master Key") {
-                                            pinInput = ""
-                                            pinError = null
-                                            showPinDialog = true
-                                        }
-                                    } else {
+                                    masterKeyGate.request(if (hasPin) "change Guardian PIN" else "set Guardian PIN") {
                                         pinInput = ""
+                                        confirmPinInput = ""
                                         pinError = null
                                         showPinDialog = true
                                     }
@@ -570,10 +566,16 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(14.dp))
                             OutlinedTextField(
                                 value = pinInput,
-                                onValueChange = { if (it.length <= 8 && it.all { char -> char.isDigit() }) pinInput = it },
-                                label = { Text("Guardian PIN") },
+                                onValueChange = {
+                                    if (it.length <= 8 && it.all { char -> char.isDigit() }) {
+                                        pinInput = it
+                                        pinError = null
+                                    }
+                                },
+                                label = { Text("New Guardian PIN") },
                                 visualTransformation = PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 isError = pinError != null,
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -582,14 +584,41 @@ fun SettingsScreen(
                                     focusedTextColor = AegisTextPrimary,
                                     unfocusedTextColor = AegisTextPrimary
                                 ),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("change_pin_input")
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = confirmPinInput,
+                                onValueChange = {
+                                    if (it.length <= 8 && it.all { char -> char.isDigit() }) {
+                                        confirmPinInput = it
+                                        pinError = null
+                                    }
+                                },
+                                label = { Text("Confirm New PIN") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                isError = pinError != null,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AegisPrimaryCyan,
+                                    unfocusedBorderColor = AegisCardBorder,
+                                    focusedTextColor = AegisTextPrimary,
+                                    unfocusedTextColor = AegisTextPrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("change_pin_confirm_input")
                             )
                             if (pinError != null) {
                                 Text(
                                     text = pinError!!,
                                     color = AegisDangerRed,
                                     fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    modifier = Modifier.padding(top = 6.dp)
                                 )
                             }
                         }
@@ -597,14 +626,22 @@ fun SettingsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
-                                if (pinInput.length < 4) {
-                                    pinError = "PIN must be at least 4 digits"
-                                } else {
-                                    preferences.setGuardianPin(pinInput)
-                                    showPinDialog = false
+                                when {
+                                    pinInput.length < 4 -> {
+                                        pinError = "PIN must be at least 4 digits"
+                                    }
+                                    pinInput != confirmPinInput -> {
+                                        pinError = "PINs do not match"
+                                        confirmPinInput = ""
+                                    }
+                                    else -> {
+                                        preferences.setGuardianPin(pinInput)
+                                        showPinDialog = false
+                                    }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)
+                            colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite),
+                            modifier = Modifier.testTag("change_pin_save_button")
                         ) {
                             Text(text = "SAVE PIN", fontWeight = FontWeight.Bold)
                         }

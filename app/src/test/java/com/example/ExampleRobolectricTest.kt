@@ -21,7 +21,9 @@ import com.example.detection.classifier.ClassificationResult
 import com.example.detection.classifier.ModelManager
 import com.example.detection.decision.ThreatDecisionEngine
 import com.example.detection.preprocessing.FramePreprocessor
+import com.example.monitoring.accessibility.AegisAccessibilityService
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
+import com.example.ui.navigation.isStartupGuardianAuthorized
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -54,10 +56,13 @@ class ExampleRobolectricTest {
 
         prefs.removeGuardianPin()
         assertFalse(prefs.hasGuardianPin.value)
+        assertFalse(prefs.verifyGuardianPin(""))
+        assertFalse(prefs.verifyGuardianPin("1234"))
 
         prefs.setGuardianPin("1234")
         assertTrue(prefs.hasGuardianPin.value)
         assertTrue(prefs.verifyGuardianPin("1234"))
+        assertFalse(prefs.verifyGuardianPin(""))
         assertFalse(prefs.verifyGuardianPin("9999"))
     }
 
@@ -557,5 +562,118 @@ class ExampleRobolectricTest {
         assertEquals(1, cancelledCount)
         assertEquals(2, executedCount)
         assertEquals(null, gate.pendingActionLabel)
+    }
+
+    @Test
+    fun `anti-tamper guard allows deleting or managing other apps and only locks Sheildlenz`() {
+        // Deleting another app in Google/Samsung/AOSP Package Installer must NOT ask for password
+        assertFalse(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.google.android.packageinstaller",
+                className = "com.android.packageinstaller.UninstallerActivity",
+                screenText = "WhatsApp Do you want to uninstall this app? Cancel OK"
+            )
+        )
+        assertFalse(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.samsung.android.packageinstaller",
+                className = "com.android.packageinstaller.UninstallerActivity",
+                screenText = "YouTube Uninstall this application?"
+            )
+        )
+
+        // Opening App Info / Force Stop / Uninstall for another app in Settings must NOT ask for password
+        assertFalse(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.android.settings",
+                className = "com.android.settings.applications.InstalledAppDetailsTop",
+                screenText = "App info Instagram Uninstall Force stop Storage & cache"
+            )
+        )
+
+        // Merely scrolling past Sheildlenz in Settings -> All apps list must NOT trigger password
+        assertFalse(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.android.settings",
+                className = "com.android.settings.SubSettings",
+                screenText = "All apps Chrome Sheildlenz Spotify Telegram"
+            )
+        )
+
+        // Uninstalling Sheildlenz MUST trigger password
+        assertTrue(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.google.android.packageinstaller",
+                className = "com.android.packageinstaller.UninstallerActivity",
+                screenText = "Sheildlenz Do you want to uninstall this app?"
+            )
+        )
+
+        // Opening Sheildlenz App Info / Force Stop / Device Admin / Accessibility MUST trigger password
+        assertTrue(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.android.settings",
+                className = "com.android.settings.applications.InstalledAppDetailsTop",
+                screenText = "App info Sheildlenz Uninstall Force stop"
+            )
+        )
+        assertTrue(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.android.settings",
+                className = "com.android.settings.applications.specialaccess.deviceadmin.DeviceAdminAdd",
+                screenText = "Sheildlenz Deactivate this device admin app"
+            )
+        )
+        assertTrue(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.android.settings",
+                className = "com.android.settings.SubSettings",
+                screenText = "Sheildlenz Use Sheildlenz Sheildlenz shortcut"
+            )
+        )
+    }
+
+    @Test
+    fun `startup gate always requires guardian password setup or unlock and re-locks on background`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.removeGuardianPin()
+
+        // Fresh start without PIN: must NOT skip startup password gate
+        assertFalse(
+            isStartupGuardianAuthorized(
+                hasGuardianPin = prefs.hasGuardianPin.value,
+                isSessionUnlocked = prefs.isGuardianSessionUnlocked.value
+            )
+        )
+
+        // Setting initial Guardian Password unlocks the startup session
+        prefs.setGuardianPin("2580")
+        assertTrue(
+            isStartupGuardianAuthorized(
+                hasGuardianPin = prefs.hasGuardianPin.value,
+                isSessionUnlocked = prefs.isGuardianSessionUnlocked.value
+            )
+        )
+
+        // Leaving app / next start resets session unlock so password is required again
+        prefs.onAppBackgrounded()
+        assertFalse(
+            isStartupGuardianAuthorized(
+                hasGuardianPin = prefs.hasGuardianPin.value,
+                isSessionUnlocked = prefs.isGuardianSessionUnlocked.value
+            )
+        )
+
+        // Wrong password fails; valid password unlocks startup session
+        assertFalse(prefs.verifyGuardianPin("1111"))
+        assertTrue(prefs.verifyGuardianPin("2580"))
+        prefs.unlockGuardianSession()
+        assertTrue(
+            isStartupGuardianAuthorized(
+                hasGuardianPin = prefs.hasGuardianPin.value,
+                isSessionUnlocked = prefs.isGuardianSessionUnlocked.value
+            )
+        )
     }
 }

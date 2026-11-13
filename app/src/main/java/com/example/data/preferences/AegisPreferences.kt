@@ -467,7 +467,8 @@ class AegisPreferences(context: Context) {
     }
 
     fun verifyGuardianPin(pin: String): Boolean {
-        val storedHash = prefs.getString(KEY_PIN_HASH, null) ?: return true
+        val storedHash = prefs.getString(KEY_PIN_HASH, null)
+        if (storedHash.isNullOrEmpty() || pin.isEmpty()) return false
         val inputHash = hashPin(pin)
         return storedHash == inputHash
     }

@@ -61,8 +61,10 @@ fun GuardianGateScreen(
     onUnlocked: () -> Unit
 ) {
     val telemetry by protectionRepo.telemetry.collectAsState()
-    var pinInput by remember { mutableStateOf("") }
-    var pinError by remember { mutableStateOf<String?>(null) }
+    val hasGuardianPin by preferences.hasGuardianPin.collectAsState()
+    var pinInput by remember(hasGuardianPin) { mutableStateOf("") }
+    var confirmPinInput by remember(hasGuardianPin) { mutableStateOf("") }
+    var pinError by remember(hasGuardianPin) { mutableStateOf<String?>(null) }
 
     SheildlenzBackdrop(
         modifier = Modifier
@@ -85,112 +87,170 @@ fun GuardianGateScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-            AegisShieldGraphic(
-                isProtected = telemetry.isProtectionEnabled,
-                isThreatActive = false,
-                size = 140.dp
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            StatusPill(
-                label = if (telemetry.isProtectionEnabled) "PROTECTION ARMED" else "SHIELD STANDBY",
-                isActive = telemetry.isProtectionEnabled,
-                activeColor = AegisSuccessGreen,
-                inactiveColor = AegisTextMuted
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text(
-                text = "Guardian Access Only",
-                color = AegisTextPrimary,
-                fontSize = 27.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = ClassicalDisplayFont,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Only the Guardian may open Sheildlenz to adjust policies, load models, view logs, or alter protection.",
-                color = AegisTextSecondary,
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-                fontFamily = ClassicalBodyFont,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
-            )
-
-            CyberCard(borderColor = AegisPrimaryCyan.copy(alpha = 0.25f)) {
-                OutlinedTextField(
-                    value = pinInput,
-                    onValueChange = {
-                        if (it.length <= 8 && it.all { ch -> ch.isDigit() }) {
-                            pinInput = it
-                            pinError = null
-                        }
-                    },
-                    label = { Text("Guardian Password / PIN", fontFamily = ClassicalBodyFont) },
-                    leadingIcon = {
-                        Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan)
-                    },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    isError = pinError != null,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AegisPrimaryCyan,
-                        unfocusedBorderColor = AegisCardBorder,
-                        focusedTextColor = AegisTextPrimary,
-                        unfocusedTextColor = AegisTextPrimary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("guardian_gate_pin_input")
+                AegisShieldGraphic(
+                    isProtected = telemetry.isProtectionEnabled,
+                    isThreatActive = false,
+                    size = 140.dp
                 )
 
-                if (pinError != null) {
-                    Text(
-                        text = pinError!!,
-                        color = AegisDangerRed,
-                        fontSize = 12.sp,
-                        fontFamily = ClassicalBodyFont,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.height(14.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
+                StatusPill(
+                    label = if (telemetry.isProtectionEnabled) "PROTECTION ARMED" else "SHIELD STANDBY",
+                    isActive = telemetry.isProtectionEnabled,
+                    activeColor = AegisSuccessGreen,
+                    inactiveColor = AegisTextMuted
+                )
 
-                Button(
-                    onClick = {
-                        if (preferences.verifyGuardianPin(pinInput)) {
-                            preferences.unlockGuardianSession()
-                            onUnlocked()
-                        } else {
-                            pinError = "Incorrect Guardian Password"
-                            pinInput = ""
-                        }
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    text = if (hasGuardianPin) "Guardian Access Only" else "Create Guardian Password",
+                    color = AegisTextPrimary,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalDisplayFont,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = if (hasGuardianPin) {
+                        "Enter Guardian Password to open Sheildlenz."
+                    } else {
+                        "Set a 4–8 digit password required at start, PIN change, and Shield toggle."
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AegisPrimaryCyan,
-                        contentColor = AegisOnPrimaryWhite
-                    ),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("guardian_gate_unlock_button")
-                ) {
-                    Text(
-                        text = "UNLOCK GUARDIAN CONSOLE",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = ClassicalBodyFont,
-                        letterSpacing = 0.8.sp
+                    color = AegisTextSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    fontFamily = ClassicalBodyFont,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+                )
+
+                CyberCard(borderColor = AegisPrimaryCyan.copy(alpha = 0.25f)) {
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = {
+                            if (it.length <= 8 && it.all { ch -> ch.isDigit() }) {
+                                pinInput = it
+                                pinError = null
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = if (hasGuardianPin) "Guardian Password / PIN" else "New Guardian Password (4–8 digits)",
+                                fontFamily = ClassicalBodyFont
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan)
+                        },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = pinError != null,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AegisPrimaryCyan,
+                            unfocusedBorderColor = AegisCardBorder,
+                            focusedTextColor = AegisTextPrimary,
+                            unfocusedTextColor = AegisTextPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("guardian_gate_pin_input")
                     )
+
+                    if (!hasGuardianPin) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = confirmPinInput,
+                            onValueChange = {
+                                if (it.length <= 8 && it.all { ch -> ch.isDigit() }) {
+                                    confirmPinInput = it
+                                    pinError = null
+                                }
+                            },
+                            label = {
+                                Text("Confirm Guardian Password", fontFamily = ClassicalBodyFont)
+                            },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan)
+                            },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            isError = pinError != null,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AegisPrimaryCyan,
+                                unfocusedBorderColor = AegisCardBorder,
+                                focusedTextColor = AegisTextPrimary,
+                                unfocusedTextColor = AegisTextPrimary
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("guardian_gate_confirm_pin_input")
+                        )
+                    }
+
+                    if (pinError != null) {
+                        Text(
+                            text = pinError!!,
+                            color = AegisDangerRed,
+                            fontSize = 12.sp,
+                            fontFamily = ClassicalBodyFont,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            if (hasGuardianPin) {
+                                if (pinInput.isNotEmpty() && preferences.verifyGuardianPin(pinInput)) {
+                                    preferences.unlockGuardianSession()
+                                    onUnlocked()
+                                } else {
+                                    pinError = "Incorrect Guardian Password"
+                                    pinInput = ""
+                                }
+                            } else {
+                                when {
+                                    pinInput.length < 4 -> {
+                                        pinError = "Password must be 4–8 digits"
+                                    }
+                                    pinInput != confirmPinInput -> {
+                                        pinError = "Passwords do not match"
+                                        confirmPinInput = ""
+                                    }
+                                    else -> {
+                                        preferences.setGuardianPin(pinInput)
+                                        onUnlocked()
+                                    }
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AegisPrimaryCyan,
+                            contentColor = AegisOnPrimaryWhite
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("guardian_gate_unlock_button")
+                    ) {
+                        Text(
+                            text = if (hasGuardianPin) "UNLOCK GUARDIAN CONSOLE" else "SET PASSWORD & ENTER",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalBodyFont,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
                 }
-            }
             }
         }
     }

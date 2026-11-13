@@ -108,6 +108,11 @@ private val MainTabItems = listOf(
     )
 )
 
+internal fun isStartupGuardianAuthorized(
+    hasGuardianPin: Boolean,
+    isSessionUnlocked: Boolean
+): Boolean = hasGuardianPin && isSessionUnlocked
+
 @Composable
 fun AegisNavHost(
     container: AegisContainer,
@@ -120,7 +125,10 @@ fun AegisNavHost(
     val hasGuardianPin by container.preferences.hasGuardianPin.collectAsState()
     val isGuardianUnlocked by container.preferences.isGuardianSessionUnlocked.collectAsState()
 
-    val isGuardianAuthorized = !hasGuardianPin || isGuardianUnlocked
+    val isGuardianAuthorized = isStartupGuardianAuthorized(
+        hasGuardianPin = hasGuardianPin,
+        isSessionUnlocked = isGuardianUnlocked
+    )
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route

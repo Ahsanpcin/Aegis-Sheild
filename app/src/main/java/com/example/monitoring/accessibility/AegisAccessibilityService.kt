@@ -44,20 +44,20 @@ class AegisAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 2. Anti-Tamper Settings Guard (Device Admin, Accessibility, App Info / Uninstall, Date & Time)
+        // 2. Anti-Tamper Settings Guard — ONLY when tampering with Sheildlenz itself
         if (prefs.antiTamperEnabled.value &&
             prefs.hasGuardianPin.value &&
             !prefs.isGuardianAuthorizedForSystemSettings() &&
             isSettingsOrInstallerPackage(pkgName)
         ) {
-            if (isSensitiveAdminOrAppScreen(event)) {
+            if (isSheildlenzTamperScreen(pkgName, event)) {
                 val now = SystemClock.uptimeMillis()
                 if (now - lastTamperInterceptTimeMs > 800L) {
                     lastTamperInterceptTimeMs = now
-                    Log.w(TAG, "Blocked unauthorized tamper access inside $pkgName")
+                    Log.w(TAG, "Blocked unauthorized tamper access targeting Sheildlenz inside $pkgName")
                     performGlobalAction(GLOBAL_ACTION_HOME)
                     overlayController.showTamperLockOverlay(
-                        reason = "Access to Device Administrator, Accessibility, App Uninstall, Overlay, or Clock Settings is protected. Enter Guardian Password to proceed."
+                        reason = "Modifying or uninstalling Sheildlenz (App Info, Device Admin, Accessibility, or Overlay) requires Guardian Password verification."
                     )
                 }
                 return
@@ -94,58 +94,51 @@ class AegisAccessibilityService : AccessibilityService() {
             pkgName == "com.android.emergency"
     }
 
-    private fun isSettingsOrInstallerPackage(pkgName: String): Boolean {
-        return pkgName == "com.android.settings" ||
-            pkgName == "com.android.packageinstaller" ||
-            pkgName == "com.google.android.packageinstaller" ||
-            pkgName == "com.android.permissioncontroller" ||
-            pkgName == "com.google.android.permissioncontroller"
-    }
-
-    private fun isSensitiveAdminOrAppScreen(event: AccessibilityEvent): Boolean {
-        val className = event.className?.toString()?.lowercase() ?: ""
-        if (className.contains("deviceadmin") ||
-            className.contains("installedappdetails") ||
-            className.contains("uninstaller") ||
-            className.contains("datetimesettings") ||
-            className.contains("manageoverlay")
-        ) {
-            return true
-        }
-
-        val eventText = event.text.joinToString(" ").lowercase()
-        if (containsProtectedKeyword(eventText)) {
-            return true
-        }
+    private fun isSheildlenzTamperScreen(pkgName: String, event: AccessibilityEvent): Boolean {
+        val className = event.className?.toString() ?: ""
+        val builder = StringBuilder(event.text.joinToString(" "))
 
         val root = try {
             rootInActiveWindow
         } catch (_: Exception) {
             null
-        } ?: return false
+        }
 
-        return try {
-            scanNodeForProtectedKeywords(root, depth = 0)
-        } finally {
-            @Suppress("DEPRECATION")
+        if (root != null) {
             try {
-                root.recycle()
-            } catch (_: Exception) {
+                collectWindowText(root, depth = 0, out = builder)
+            } finally {
+                @Suppress("DEPRECATION")
+                try {
+                    root.recycle()
+                } catch (_: Exception) {
+                }
             }
         }
+
+        return shouldTriggerAntiTamper(
+            packageName = pkgName,
+            className = className,
+            screenText = builder.toString()
+        )
     }
 
-    private fun scanNodeForProtectedKeywords(node: AccessibilityNodeInfo, depth: Int): Boolean {
-        if (depth > 5) return false
-        val combined = "${node.text ?: ""} ${node.contentDescription ?: ""}".lowercase()
-        if (containsProtectedKeyword(combined)) {
-            return true
+    private fun collectWindowText(node: AccessibilityNodeInfo, depth: Int, out: StringBuilder) {
+        if (depth > 6 || out.length >= MAX_INSPECTED_TEXT_CHARS) return
+        val nodeText = node.text?.toString()
+        if (!nodeText.isNullOrBlank()) {
+            out.append(' ').append(nodeText)
         }
-        val count = node.childCount.coerceAtMost(16)
+        val desc = node.contentDescription?.toString()
+        if (!desc.isNullOrBlank()) {
+            out.append(' ').append(desc)
+        }
+        val count = node.childCount.coerceAtMost(24)
         for (i in 0 until count) {
+            if (out.length >= MAX_INSPECTED_TEXT_CHARS) break
             val child = node.getChild(i) ?: continue
-            val hit = try {
-                scanNodeForProtectedKeywords(child, depth + 1)
+            try {
+                collectWindowText(child, depth + 1, out)
             } finally {
                 @Suppress("DEPRECATION")
                 try {
@@ -153,14 +146,7 @@ class AegisAccessibilityService : AccessibilityService() {
                 } catch (_: Exception) {
                 }
             }
-            if (hit) return true
         }
-        return false
-    }
-
-    private fun containsProtectedKeyword(text: String): Boolean {
-        if (text.isBlank()) return false
-        return PROTECTED_KEYWORDS.any { keyword -> text.contains(keyword) }
     }
 
     override fun onInterrupt() {
@@ -188,21 +174,67 @@ class AegisAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AegisAccessibility"
+        private const val MAX_INSPECTED_TEXT_CHARS = 4096
 
-        private val PROTECTED_KEYWORDS = listOf(
+        private val SHEILDLENZ_IDENTIFIERS = listOf(
             "sheildlenz",
+            "shieldlenz",
+            "com.ahsan.tcr.sheildlenz"
+        )
+
+        private val TAMPER_ACTION_KEYWORDS = listOf(
+            "uninstall",
+            "force stop",
+            "deactivate",
+            "disable",
             "device admin",
             "device administrator",
-            "device administrators",
-            "deactivate",
-            "force stop",
-            "uninstall",
-            "display over other apps",
-            "draw over other apps",
-            "date & time",
-            "set time",
-            "automatic date"
+            "use sheildlenz",
+            "sheildlenz shortcut",
+            "allow display over other apps",
+            "allow draw over other apps",
+            "permit drawing over other apps",
+            "clear storage",
+            "clear data"
         )
+
+        fun isSettingsOrInstallerPackage(pkgName: String): Boolean {
+            val lower = pkgName.lowercase()
+            return lower == "com.android.settings" ||
+                lower.contains("packageinstaller") ||
+                lower.contains("permissioncontroller")
+        }
+
+        fun shouldTriggerAntiTamper(
+            packageName: String,
+            className: String,
+            screenText: String
+        ): Boolean {
+            val pkg = packageName.lowercase()
+            val cls = className.lowercase()
+            val text = screenText.lowercase()
+
+            if (!isSettingsOrInstallerPackage(pkg) && !cls.contains("uninstaller") && !cls.contains("deviceadminadd")) {
+                return false
+            }
+
+            // Password is ONLY required when the active screen targets Sheildlenz itself.
+            val targetsSheildlenz = SHEILDLENZ_IDENTIFIERS.any { id -> text.contains(id) }
+            if (!targetsSheildlenz) {
+                return false
+            }
+
+            // On dedicated installer/uninstaller or Device Admin confirmation screens, targeting Sheildlenz is unambiguous.
+            if (pkg.contains("packageinstaller") ||
+                cls.contains("uninstaller") ||
+                cls.contains("deviceadminadd")
+            ) {
+                return true
+            }
+
+            // On Settings/Permission screens (e.g., App Info vs Apps List), require a tamper action keyword alongside Sheildlenz.
+            return TAMPER_ACTION_KEYWORDS.any { keyword -> text.contains(keyword) }
+        }
 
         @Volatile
         private var instance: AegisAccessibilityService? = null
