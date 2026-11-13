@@ -60,4 +60,5 @@ Please remember your **Master Password**. Because this app uses strict Device Ad
 ---
 
 ## 🤝 Built By
-Created by **[Aapka Naam]** and **[Dost Ka Naam]**. Feel free to open an Issue if you find a bug or have a feature request!
+Created by **[AhsanTCr]**. 
+Feel free to open an Issue if you find a bug or have a feature request!
