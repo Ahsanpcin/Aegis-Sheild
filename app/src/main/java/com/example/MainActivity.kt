@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
     private fun requestStartProtection() {
         val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
         if (projectionManager != null) {
+            container.preferences.beginAuthorizedExternalFlow()
             mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
         } else {
             Toast.makeText(this, "MediaProjection service unavailable on this device.", Toast.LENGTH_SHORT).show()

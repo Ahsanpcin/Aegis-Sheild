@@ -378,6 +378,7 @@ fun DashboardScreen(
                             telemetry = telemetry,
                             modelManager = modelManager,
                             onModelUpdated = onModelUpdated,
+                            onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() },
                             onRequireAuth = { label, action ->
                                 masterKeyGate.request(label) { action() }
                             }
@@ -391,7 +392,8 @@ fun DashboardScreen(
                         telemetry = telemetry,
                         modelManager = modelManager,
                         sensitivity = sensitivity,
-                        isStrictEverything = isStrictEverything
+                        isStrictEverything = isStrictEverything,
+                        onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() }
                     )
                 }
             }
@@ -453,6 +455,7 @@ fun DashboardScreen(
                         Button(
                             onClick = {
                                 showMissingModelDialog = false
+                                preferences.beginAuthorizedExternalFlow()
                                 quickModelPickerLauncher.launch(arrayOf("*/*"))
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)

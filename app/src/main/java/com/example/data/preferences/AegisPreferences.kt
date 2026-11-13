@@ -127,6 +127,9 @@ class AegisPreferences(context: Context) {
     @Volatile
     private var explicitSettingsTripPending: Boolean = false
 
+    @Volatile
+    private var authorizedExternalFlowUntilRealtime: Long = 0L
+
     private fun getSavedSensitivity(): SensitivityLevel {
         val name = prefs.getString(KEY_SENSITIVITY, SensitivityLevel.BALANCED.name)
         return try {
@@ -443,9 +446,20 @@ class AegisPreferences(context: Context) {
         _isGuardianSessionUnlocked.value = false
         guardianSettingsBypassUntilRealtime = 0L
         explicitSettingsTripPending = false
+        authorizedExternalFlowUntilRealtime = 0L
+    }
+
+    fun beginAuthorizedExternalFlow(windowMillis: Long = 180_000L) {
+        authorizedExternalFlowUntilRealtime = SystemClock.elapsedRealtime() + windowMillis
     }
 
     fun onAppBackgrounded() {
+        val now = SystemClock.elapsedRealtime()
+        val withinAuthorizedExternalFlow = now <= authorizedExternalFlowUntilRealtime
+        authorizedExternalFlowUntilRealtime = 0L
+        if (withinAuthorizedExternalFlow) {
+            return
+        }
         _isGuardianSessionUnlocked.value = false
         if (explicitSettingsTripPending) {
             explicitSettingsTripPending = false
@@ -456,6 +470,7 @@ class AegisPreferences(context: Context) {
 
     fun grantTemporarySettingsAuthorization(minutes: Int = _guardianSettingsWindowMinutes.value) {
         explicitSettingsTripPending = true
+        beginAuthorizedExternalFlow(minutes * 60_000L)
         guardianSettingsBypassUntilRealtime =
             SystemClock.elapsedRealtime() + (minutes * 60_000L)
     }

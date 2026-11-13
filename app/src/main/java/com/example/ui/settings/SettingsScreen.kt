@@ -138,6 +138,7 @@ fun SettingsScreen(
                         telemetry = telemetry,
                         modelManager = modelManager,
                         onModelUpdated = onModelUpdated,
+                        onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() },
                         onRequireAuth = { label, action ->
                             masterKeyGate.request(label) { action() }
                         }

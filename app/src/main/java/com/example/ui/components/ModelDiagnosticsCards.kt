@@ -81,6 +81,7 @@ fun ModelManagerCard(
     modelManager: ModelManager,
     onModelUpdated: () -> Unit,
     modifier: Modifier = Modifier,
+    onBeforeOpenPicker: () -> Unit = {},
     onRequireAuth: (actionLabel: String, onAuthorized: () -> Unit) -> Unit = { _, action -> action() }
 ) {
     val scope = rememberCoroutineScope()
@@ -244,6 +245,7 @@ fun ModelManagerCard(
                 onClick = {
                     val label = if (telemetry.isModelLoaded) "replace AI model" else "load AI model"
                     onRequireAuth(label) {
+                        onBeforeOpenPicker()
                         modelPickerLauncher.launch(arrayOf("*/*"))
                     }
                 },
@@ -313,7 +315,8 @@ fun SampleImageTesterCard(
     modelManager: ModelManager,
     sensitivity: SensitivityLevel,
     isStrictEverything: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onBeforeOpenPicker: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -394,6 +397,7 @@ fun SampleImageTesterCard(
 
         Button(
             onClick = {
+                onBeforeOpenPicker()
                 photoPickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )

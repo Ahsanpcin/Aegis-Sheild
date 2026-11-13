@@ -676,4 +676,21 @@ class ExampleRobolectricTest {
             )
         )
     }
+
+    @Test
+    fun `authorized external picker flow preserves unlock across single background hop then relocks normally`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.setGuardianPin("2580")
+        assertTrue(prefs.isGuardianSessionUnlocked.value)
+
+        // Launching .tflite file picker after Master Key verification keeps session unlocked across picker hop
+        prefs.beginAuthorizedExternalFlow()
+        prefs.onAppBackgrounded()
+        assertTrue(prefs.isGuardianSessionUnlocked.value)
+
+        // Subsequent normal app backgrounding (after returning from picker) re-locks Guardian session
+        prefs.onAppBackgrounded()
+        assertFalse(prefs.isGuardianSessionUnlocked.value)
+    }
 }
