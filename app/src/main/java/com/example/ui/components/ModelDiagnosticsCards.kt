@@ -58,10 +58,17 @@ import com.example.detection.classifier.ModelManager
 import com.example.detection.classifier.SampleImageTester
 import com.example.detection.classifier.SampleTestResult
 import com.example.ui.theme.AegisCardBorder
+import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisSurfaceElevated
@@ -71,6 +78,7 @@ import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
+import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,6 +89,7 @@ fun ModelManagerCard(
     modelManager: ModelManager,
     onModelUpdated: () -> Unit,
     modifier: Modifier = Modifier,
+    cardTone: CyberCardTone? = null,
     onBeforeOpenPicker: () -> Unit = {},
     onRequireAuth: (actionLabel: String, onAuthorized: () -> Unit) -> Unit = { _, action -> action() }
 ) {
@@ -115,12 +124,21 @@ fun ModelManagerCard(
 
     val errorToShow = localError ?: telemetry.modelErrorMessage
     val accent = when {
-        errorToShow != null -> AegisDangerRed
-        telemetry.isModelLoaded -> AegisSuccessGreen
-        else -> AegisWarningAmber
+        errorToShow != null -> AegisWarningAmber
+        telemetry.isModelLoaded -> AegisPrimaryCyan
+        else -> AegisChampagneGold
+    }
+    val resolvedTone = cardTone ?: if (telemetry.isModelLoaded && errorToShow == null) {
+        CyberCardTone.SKY
+    } else {
+        CyberCardTone.GOLD
     }
 
-    CyberCard(modifier = modifier, borderColor = accent.copy(alpha = 0.35f)) {
+    CyberCard(
+        modifier = modifier,
+        borderColor = accent.copy(alpha = 0.45f),
+        tone = resolvedTone
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -132,17 +150,20 @@ fun ModelManagerCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(accent.copy(alpha = 0.12f))
-                        .border(1.dp, accent.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(accent, AegisPurple)
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Memory,
                         contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(20.dp)
+                        tint = AegisOnPrimaryWhite,
+                        modifier = Modifier.size(21.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -156,8 +177,9 @@ fun ModelManagerCard(
                     )
                     Text(
                         text = telemetry.loadedModelName ?: "No model file attached",
-                        color = if (telemetry.isModelLoaded) AegisPrimaryCyan else AegisTextMuted,
+                        color = if (telemetry.isModelLoaded) AegisPrimaryCyan else AegisWarningAmber,
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                         fontFamily = ClassicalBodyFont
                     )
                 }
@@ -170,8 +192,8 @@ fun ModelManagerCard(
                     else -> "MISSING"
                 },
                 isActive = telemetry.isModelLoaded && errorToShow == null,
-                activeColor = AegisSuccessGreen,
-                inactiveColor = if (errorToShow != null) AegisDangerRed else AegisWarningAmber
+                activeColor = AegisPrimaryCyan,
+                inactiveColor = AegisWarningAmber
             )
         }
 
@@ -182,12 +204,12 @@ fun ModelManagerCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(AegisSurfaceElevated)
-                    .border(1.dp, AegisCardBorder, RoundedCornerShape(14.dp))
+                    .background(AegisLavenderSoft.copy(alpha = 0.72f))
+                    .border(1.dp, AegisLavenderBorder, RoundedCornerShape(14.dp))
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 ModelMetaRow("Input Tensor", telemetry.modelInputSpec)
-                HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = AegisLavenderBorder.copy(alpha = 0.65f), modifier = Modifier.padding(vertical = 4.dp))
                 ModelMetaRow(
                     "Class Mapping",
                     when (telemetry.modelOutputClasses) {
@@ -213,21 +235,21 @@ fun ModelManagerCard(
                     .fillMaxWidth()
                     .padding(top = 12.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AegisDangerRed.copy(alpha = 0.08f))
-                    .border(1.dp, AegisDangerRed.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .background(AegisChampagneSoft)
+                    .border(1.dp, AegisGoldBorder, RoundedCornerShape(12.dp))
                     .padding(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = null,
-                        tint = AegisDangerRed,
+                        tint = AegisWarningAmber,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = errorToShow ?: "",
-                        color = AegisDangerRed,
+                        color = AegisTextPrimary,
                         fontSize = 12.sp,
                         lineHeight = 17.sp
                     )
@@ -251,7 +273,7 @@ fun ModelManagerCard(
                 },
                 enabled = !isImporting,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AegisPrimaryCyan,
+                    containerColor = if (telemetry.isModelLoaded) AegisPurple else AegisPrimaryCyan,
                     contentColor = AegisOnPrimaryWhite
                 ),
                 shape = RoundedCornerShape(14.dp),
@@ -297,7 +319,10 @@ fun ModelManagerCard(
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisDangerRed),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = AegisChampagneSoft,
+                        contentColor = AegisWarningAmber
+                    ),
                     modifier = Modifier
                         .height(48.dp)
                         .testTag("remove_tflite_model_button")
@@ -316,6 +341,7 @@ fun SampleImageTesterCard(
     sensitivity: SensitivityLevel,
     isStrictEverything: Boolean,
     modifier: Modifier = Modifier,
+    cardTone: CyberCardTone = CyberCardTone.LAVENDER,
     onBeforeOpenPicker: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -352,7 +378,11 @@ fun SampleImageTesterCard(
         }
     }
 
-    CyberCard(modifier = modifier, borderColor = AegisElectricBlue.copy(alpha = 0.30f)) {
+    CyberCard(
+        modifier = modifier,
+        borderColor = AegisLavenderBorder,
+        tone = cardTone
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -361,16 +391,19 @@ fun SampleImageTesterCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AegisElectricBlue.copy(alpha = 0.12f))
-                        .border(1.dp, AegisElectricBlue.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(AegisPurple, AegisLavenderLight)
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.ImageSearch,
                         contentDescription = null,
-                        tint = AegisElectricBlue,
+                        tint = AegisOnPrimaryWhite,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -385,8 +418,9 @@ fun SampleImageTesterCard(
                     )
                     Text(
                         text = "Offline photo check",
-                        color = AegisTextMuted,
+                        color = AegisPurple,
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                         fontFamily = ClassicalBodyFont
                     )
                 }
@@ -404,24 +438,19 @@ fun SampleImageTesterCard(
             },
             enabled = telemetry.isModelLoaded && !isTesting,
             colors = ButtonDefaults.buttonColors(
-                containerColor = AegisSecondaryBackground,
-                contentColor = AegisElectricBlue,
-                disabledContainerColor = AegisSecondaryBackground.copy(alpha = 0.55f),
-                disabledContentColor = AegisTextMuted
+                containerColor = AegisPurple,
+                contentColor = AegisOnPrimaryWhite,
+                disabledContainerColor = AegisLavenderLight.copy(alpha = 0.45f),
+                disabledContentColor = AegisTextPrimary
             ),
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .border(
-                    1.dp,
-                    if (telemetry.isModelLoaded) AegisElectricBlue.copy(alpha = 0.45f) else AegisCardBorder,
-                    RoundedCornerShape(14.dp)
-                )
                 .testTag("test_sample_image_button")
         ) {
             if (isTesting) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisElectricBlue, strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisOnPrimaryWhite, strokeWidth = 2.dp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("RUNNING INFERENCE...", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
             } else {
@@ -440,7 +469,7 @@ fun SampleImageTesterCard(
         AnimatedVisibility(visible = testError != null) {
             Text(
                 text = testError ?: "",
-                color = AegisDangerRed,
+                color = AegisWarningAmber,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -453,7 +482,7 @@ fun SampleImageTesterCard(
                         .fillMaxWidth()
                         .padding(top = 14.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(AegisSurfaceElevated)
+                        .background(AegisSecondaryBackground.copy(alpha = 0.85f))
                         .border(1.dp, AegisCardBorder, RoundedCornerShape(16.dp))
                         .padding(14.dp)
                 ) {
@@ -469,14 +498,14 @@ fun SampleImageTesterCard(
                             modifier = Modifier
                                 .size(70.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, AegisCardBorder, RoundedCornerShape(12.dp))
+                                .border(1.5.dp, AegisLavenderBorder, RoundedCornerShape(12.dp))
                         )
 
                         Column(modifier = Modifier.weight(1f)) {
                             StatusPill(
                                 label = if (result.decision.shouldBlock) "WOULD BLOCK" else "ALLOWED (SAFE)",
                                 isActive = true,
-                                activeColor = if (result.decision.shouldBlock) AegisDangerRed else AegisSuccessGreen
+                                activeColor = if (result.decision.shouldBlock) AegisChampagneGold else AegisPrimaryCyan
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
@@ -496,9 +525,9 @@ fun SampleImageTesterCard(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    ScoreProgressBar("Safe", result.classification.safeScore, AegisSuccessGreen)
-                    ScoreProgressBar("Suggestive", result.classification.suggestiveScore, AegisWarningAmber)
-                    ScoreProgressBar("Explicit", result.classification.explicitScore, AegisDangerRed)
+                    ScoreProgressBar("Safe", result.classification.safeScore, AegisPrimaryCyan)
+                    ScoreProgressBar("Suggestive", result.classification.suggestiveScore, AegisPurple)
+                    ScoreProgressBar("Explicit", result.classification.explicitScore, AegisChampagneGold)
 
                     if (result.classification.rawClassScores.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))

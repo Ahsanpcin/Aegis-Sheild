@@ -152,7 +152,7 @@ fun AegisNavHost(
         Row(modifier = Modifier.fillMaxSize()) {
             if (useNavigationRail) {
                 NavigationRail(
-                    containerColor = AegisCardBackground,
+                    containerColor = com.example.ui.theme.AegisLavenderSoft,
                     contentColor = AegisTextPrimary,
                     modifier = Modifier.fillMaxHeight()
                 ) {
@@ -180,7 +180,7 @@ fun AegisNavHost(
                             colors = NavigationRailItemDefaults.colors(
                                 selectedIconColor = AegisPrimaryCyan,
                                 selectedTextColor = AegisPrimaryCyan,
-                                indicatorColor = AegisPrimaryCyan.copy(alpha = 0.12f),
+                                indicatorColor = com.example.ui.theme.AegisPurple.copy(alpha = 0.18f),
                                 unselectedIconColor = AegisTextMuted,
                                 unselectedTextColor = AegisTextMuted
                             ),
@@ -199,14 +199,21 @@ fun AegisNavHost(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(AegisCardBackground)
+                                .background(
+                                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                        colors = listOf(
+                                            com.example.ui.theme.AegisSecondaryBackground,
+                                            com.example.ui.theme.AegisLavenderSoft
+                                        )
+                                    )
+                                )
                         ) {
                             HorizontalDivider(
-                                thickness = 1.dp,
-                                color = AegisChampagneGold.copy(alpha = 0.30f)
+                                thickness = 1.5.dp,
+                                color = AegisChampagneGold.copy(alpha = 0.65f)
                             )
                             NavigationBar(
-                                containerColor = AegisCardBackground,
+                                containerColor = androidx.compose.ui.graphics.Color.Transparent,
                                 contentColor = AegisTextPrimary,
                                 windowInsets = NavigationBarDefaults.windowInsets,
                                 tonalElevation = 0.dp
@@ -235,7 +242,7 @@ fun AegisNavHost(
                                         colors = NavigationBarItemDefaults.colors(
                                             selectedIconColor = AegisPrimaryCyan,
                                             selectedTextColor = AegisPrimaryCyan,
-                                            indicatorColor = AegisPrimaryCyan.copy(alpha = 0.12f),
+                                            indicatorColor = com.example.ui.theme.AegisPurple.copy(alpha = 0.18f),
                                             unselectedIconColor = AegisTextMuted,
                                             unselectedTextColor = AegisTextMuted
                                         ),

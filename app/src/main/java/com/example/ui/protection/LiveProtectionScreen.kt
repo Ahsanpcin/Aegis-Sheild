@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -55,6 +56,7 @@ import com.example.data.repository.ProtectionRepository
 import com.example.monitoring.accessibility.AegisAccessibilityService
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.MetricTile
@@ -62,7 +64,12 @@ import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
 import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBorder
+import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
@@ -131,7 +138,10 @@ fun LiveProtectionScreen(
                 item {
                     LuxurySectionHeader(title = "AI Classifications", accentColor = AegisPurple)
                     Spacer(modifier = Modifier.height(10.dp))
-                    CyberCard(borderColor = AegisPurple.copy(alpha = 0.28f)) {
+                    CyberCard(
+                        borderColor = AegisLavenderBorder,
+                        tone = CyberCardTone.LAVENDER
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -140,12 +150,16 @@ fun LiveProtectionScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(AegisPurple.copy(alpha = 0.12f)),
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(11.dp))
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(AegisPurple, AegisLavenderLight)
+                                            )
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(imageVector = Icons.Default.Memory, contentDescription = null, tint = AegisPurple, modifier = Modifier.size(18.dp))
+                                    Icon(imageVector = Icons.Default.Memory, contentDescription = null, tint = AegisOnPrimaryWhite, modifier = Modifier.size(19.dp))
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
@@ -160,26 +174,26 @@ fun LiveProtectionScreen(
                             StatusPill(
                                 label = if (telemetry.isProtectionEnabled) "ENGAGED" else "OFFLINE",
                                 isActive = telemetry.isProtectionEnabled,
-                                activeColor = AegisSuccessGreen,
-                                inactiveColor = AegisTextMuted
+                                activeColor = AegisPrimaryCyan,
+                                inactiveColor = AegisChampagneGold
                             )
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         TelemetryDataRow(label = "Active Monitored App", value = activeAppName)
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AegisLavenderBorder.copy(alpha = 0.65f))
                         TelemetryDataRow(label = "Model Status", value = telemetry.modelStatusMessage)
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AegisLavenderBorder.copy(alpha = 0.65f))
                         TelemetryDataRow(label = "Loaded File", value = telemetry.loadedModelName ?: "None (Load .tflite)")
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AegisLavenderBorder.copy(alpha = 0.65f))
                         TelemetryDataRow(label = "Input Tensor", value = telemetry.modelInputSpec)
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AegisLavenderBorder.copy(alpha = 0.65f))
                         TelemetryDataRow(
                             label = "Output Format",
                             value = if (telemetry.modelOutputClasses > 0) "${telemetry.modelOutputClasses}-Class Auto" else "Unconfigured"
                         )
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
+                        HorizontalDivider(color = AegisLavenderBorder.copy(alpha = 0.65f))
                         TelemetryDataRow(
                             label = "Last Category",
                             value = telemetry.lastDetectedCategory?.displayName ?: "Clean Screen Stream"
@@ -189,7 +203,7 @@ fun LiveProtectionScreen(
 
                 // 2. Live Rates & Frames Widgets
                 item {
-                    LuxurySectionHeader(title = "Live Rates & Frames")
+                    LuxurySectionHeader(title = "Live Rates & Frames", accentColor = AegisPrimaryCyan)
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -208,7 +222,7 @@ fun LiveProtectionScreen(
                             title = "Frames Scanned",
                             value = telemetry.framesProcessedCount.toString(),
                             icon = Icons.Default.Camera,
-                            accentColor = AegisElectricBlue,
+                            accentColor = AegisChampagneGold,
                             caption = "Volatile RAM",
                             modifier = Modifier.weight(1f)
                         )
@@ -217,9 +231,12 @@ fun LiveProtectionScreen(
 
                 // 3. Last: Permissions Widget (Permission Health Audit)
                 item {
-                    LuxurySectionHeader(title = "Permissions")
+                    LuxurySectionHeader(title = "Permissions", accentColor = AegisChampagneGold)
                     Spacer(modifier = Modifier.height(10.dp))
-                    CyberCard(borderColor = AegisCardBorder) {
+                    CyberCard(
+                        borderColor = AegisCardBorder,
+                        tone = CyberCardTone.SKY
+                    ) {
                         Text(
                             text = "Permission Health Audit",
                             color = AegisTextPrimary,
@@ -348,8 +365,11 @@ private fun PermissionHealthRow(
             OutlinedButton(
                 onClick = onFix,
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisPrimaryCyan),
-                modifier = Modifier.height(34.dp)
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = AegisChampagneSoft,
+                    contentColor = AegisWarningAmber
+                ),
+                modifier = Modifier.height(36.dp)
             ) {
                 Text(text = "FIX", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
             }

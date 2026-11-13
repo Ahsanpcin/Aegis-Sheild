@@ -41,11 +41,13 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisSurfaceElevated
+import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
-import com.example.ui.theme.AegisVoidBackground
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 
@@ -74,17 +76,17 @@ fun SheildlenzScaffoldBrandBar(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                brush = Brush.verticalGradient(
+                brush = Brush.horizontalGradient(
                     colors = listOf(
-                        AegisVoidBackground.copy(alpha = 0.90f),
-                        AegisCardBackground.copy(alpha = 0.98f)
+                        AegisSecondaryBackground,
+                        AegisLavenderSoft
                     )
                 )
             )
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.75f))
+        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.85f))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -97,7 +99,7 @@ fun SheildlenzScaffoldBrandBar(
 }
 
 /**
- * Compact luxury attribution pill displaying "Built By AhsanTCr" and clickable contact link.
+ * Compact colorful attribution pill displaying "Built By AhsanTCr" and clickable contact link.
  */
 @Composable
 fun AhsanTcrBrandingPill(
@@ -111,10 +113,10 @@ fun AhsanTcrBrandingPill(
             .clip(RoundedCornerShape(50))
             .background(
                 brush = Brush.horizontalGradient(
-                    colors = listOf(AegisCardBackground, AegisSurfaceElevated)
+                    colors = listOf(AegisChampagneSoft, AegisLavenderSoft, AegisCardBackground)
                 )
             )
-            .border(1.dp, AegisChampagneGold.copy(alpha = 0.55f), RoundedCornerShape(50))
+            .border(1.2.dp, AegisGoldBorder, RoundedCornerShape(50))
             .clickable { openAhsanTcrContact(context) }
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("built_by_ahsantcr_link"),

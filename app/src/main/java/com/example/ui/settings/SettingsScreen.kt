@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -59,6 +60,7 @@ import com.example.data.repository.ProtectionRepository
 import com.example.detection.classifier.ModelManager
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.ModelManagerCard
@@ -67,9 +69,16 @@ import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisGoldBright
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
@@ -132,12 +141,13 @@ fun SettingsScreen(
             ) {
                 // 1. Load / Change AI Model Widget (Top)
                 item {
-                    LuxurySectionHeader(title = "Load / Change AI")
+                    LuxurySectionHeader(title = "Load / Change AI", accentColor = AegisPurple)
                     Spacer(modifier = Modifier.height(8.dp))
                     ModelManagerCard(
                         telemetry = telemetry,
                         modelManager = modelManager,
                         onModelUpdated = onModelUpdated,
+                        cardTone = CyberCardTone.LAVENDER,
                         onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() },
                         onRequireAuth = { label, action ->
                             masterKeyGate.request(label) { action() }
@@ -147,9 +157,12 @@ fun SettingsScreen(
 
                 // 2. PIN Change of Guardian
                 item {
-                    LuxurySectionHeader(title = "Guardian PIN")
+                    LuxurySectionHeader(title = "Guardian PIN", accentColor = AegisChampagneGold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    CyberCard(borderColor = if (hasPin) AegisChampagneGold.copy(alpha = 0.45f) else AegisWarningAmber.copy(alpha = 0.45f)) {
+                    CyberCard(
+                        borderColor = AegisGoldBorder,
+                        tone = CyberCardTone.GOLD
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -158,12 +171,16 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Box(
                                     modifier = Modifier
-                                        .size(38.dp)
+                                        .size(40.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(AegisPrimaryCyan.copy(alpha = 0.12f)),
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(AegisChampagneGold, AegisGoldBright)
+                                            )
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan, modifier = Modifier.size(18.dp))
+                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisOnPrimaryWhite, modifier = Modifier.size(19.dp))
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
@@ -176,8 +193,9 @@ fun SettingsScreen(
                                     )
                                     Text(
                                         text = if (hasPin) "Active • Locks app & admin" else "Not configured",
-                                        color = if (hasPin) AegisSuccessGreen else AegisWarningAmber,
+                                        color = if (hasPin) AegisPrimaryCyan else AegisWarningAmber,
                                         fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
                                         fontFamily = ClassicalBodyFont
                                     )
                                 }
@@ -193,13 +211,11 @@ fun SettingsScreen(
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (hasPin) AegisSurfaceElevated else AegisPrimaryCyan,
-                                    contentColor = if (hasPin) AegisPrimaryCyan else AegisOnPrimaryWhite
+                                    containerColor = if (hasPin) AegisPurple else AegisPrimaryCyan,
+                                    contentColor = AegisOnPrimaryWhite
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .border(1.dp, AegisPrimaryCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                                    .testTag("guardian_pin_change_button")
+                                modifier = Modifier.testTag("guardian_pin_change_button")
                             ) {
                                 Text(
                                     text = if (hasPin) "CHANGE" else "SETUP",
@@ -214,9 +230,9 @@ fun SettingsScreen(
 
                 // 3. Thresholds
                 item {
-                    LuxurySectionHeader(title = "Thresholds")
+                    LuxurySectionHeader(title = "Thresholds", accentColor = AegisPrimaryCyan)
                     Spacer(modifier = Modifier.height(8.dp))
-                    CyberCard(borderColor = AegisCardBorder) {
+                    CyberCard(borderColor = AegisCardBorder, tone = CyberCardTone.SKY) {
                         Text(
                             text = "Detection Sensitivity",
                             color = AegisTextPrimary,
@@ -229,6 +245,16 @@ fun SettingsScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SensitivityLevel.entries.forEach { level ->
                                 val isSelected = (sensitivity == level)
+                                val levelAccent = when (level) {
+                                    SensitivityLevel.PERMISSIVE -> AegisPrimaryCyan
+                                    SensitivityLevel.BALANCED -> AegisPurple
+                                    SensitivityLevel.STRICT -> AegisChampagneGold
+                                }
+                                val selectedFill = when (level) {
+                                    SensitivityLevel.PERMISSIVE -> AegisSurfaceElevated
+                                    SensitivityLevel.BALANCED -> AegisLavenderSoft
+                                    SensitivityLevel.STRICT -> AegisChampagneSoft
+                                }
                                 val shortCaption = when (level) {
                                     SensitivityLevel.PERMISSIVE -> "Blocks explicit content only"
                                     SensitivityLevel.BALANCED -> "Explicit + high-confidence suggestive"
@@ -238,10 +264,10 @@ fun SettingsScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(14.dp))
-                                        .background(if (isSelected) AegisPrimaryCyan.copy(alpha = 0.07f) else AegisSurfaceElevated)
+                                        .background(if (isSelected) selectedFill else AegisCardBackground.copy(alpha = 0.72f))
                                         .border(
-                                            1.dp,
-                                            if (isSelected) AegisPrimaryCyan.copy(alpha = 0.45f) else AegisCardBorder,
+                                            if (isSelected) 1.5.dp else 1.dp,
+                                            if (isSelected) levelAccent else AegisCardBorder,
                                             RoundedCornerShape(14.dp)
                                         )
                                         .clickable {
@@ -326,12 +352,12 @@ fun SettingsScreen(
 
                 // 4. Resistance
                 item {
-                    LuxurySectionHeader(title = "Resistance", accentColor = AegisDangerRed)
+                    LuxurySectionHeader(title = "Resistance", accentColor = AegisChampagneGold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.30f)) {
+                    CyberCard(borderColor = AegisGoldBorder, tone = CyberCardTone.GOLD) {
                         Text(
                             text = "Lockdown Penalty: $stage1DurationLabel",
-                            color = AegisDangerRed,
+                            color = AegisWarningAmber,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = ClassicalDisplayFont
@@ -351,8 +377,8 @@ fun SettingsScreen(
                                     },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = if (selected) AegisPrimaryCyan else AegisSurfaceElevated,
-                                        contentColor = if (selected) AegisOnPrimaryWhite else AegisTextSecondary
+                                        containerColor = if (selected) AegisChampagneGold else AegisCardBackground,
+                                        contentColor = if (selected) AegisOnPrimaryWhite else AegisTextPrimary
                                     ),
                                     modifier = Modifier
                                         .weight(1f)
@@ -547,7 +573,7 @@ fun SettingsScreen(
             if (showPinDialog) {
                 AlertDialog(
                     onDismissRequest = { showPinDialog = false },
-                    containerColor = AegisCardBackground,
+                    containerColor = AegisLavenderSoft,
                     titleContentColor = AegisTextPrimary,
                     title = {
                         Text(
@@ -580,8 +606,10 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 isError = pinError != null,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AegisPrimaryCyan,
-                                    unfocusedBorderColor = AegisCardBorder,
+                                    focusedBorderColor = AegisPurple,
+                                    unfocusedBorderColor = AegisLavenderBorder,
+                                    focusedContainerColor = AegisCardBackground,
+                                    unfocusedContainerColor = AegisCardBackground,
                                     focusedTextColor = AegisTextPrimary,
                                     unfocusedTextColor = AegisTextPrimary
                                 ),
@@ -605,8 +633,10 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 isError = pinError != null,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AegisPrimaryCyan,
-                                    unfocusedBorderColor = AegisCardBorder,
+                                    focusedBorderColor = AegisPurple,
+                                    unfocusedBorderColor = AegisLavenderBorder,
+                                    focusedContainerColor = AegisCardBackground,
+                                    unfocusedContainerColor = AegisCardBackground,
                                     focusedTextColor = AegisTextPrimary,
                                     unfocusedTextColor = AegisTextPrimary
                                 ),
@@ -617,8 +647,9 @@ fun SettingsScreen(
                             if (pinError != null) {
                                 Text(
                                     text = pinError!!,
-                                    color = AegisDangerRed,
+                                    color = AegisWarningAmber,
                                     fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(top = 6.dp)
                                 )
                             }
@@ -641,7 +672,7 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite),
+                            colors = ButtonDefaults.buttonColors(containerColor = AegisPurple, contentColor = AegisOnPrimaryWhite),
                             modifier = Modifier.testTag("change_pin_save_button")
                         ) {
                             Text(text = "SAVE PIN", fontWeight = FontWeight.Bold)
@@ -650,9 +681,12 @@ fun SettingsScreen(
                     dismissButton = {
                         OutlinedButton(
                             onClick = { showPinDialog = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisTextSecondary)
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AegisChampagneSoft,
+                                contentColor = AegisTextPrimary
+                            )
                         ) {
-                            Text(text = "CANCEL")
+                            Text(text = "CANCEL", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 )

@@ -60,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -76,6 +77,7 @@ import com.example.detection.classifier.ModelImportResult
 import com.example.detection.classifier.ModelManager
 import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SampleImageTesterCard
@@ -85,8 +87,13 @@ import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
+import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
@@ -156,22 +163,22 @@ fun DashboardScreen(
         }
     }
     val heroBorderColor by animateColorAsState(
-        targetValue = if (isOn) AegisSuccessGreen.copy(alpha = 0.48f) else AegisChampagneGold.copy(alpha = 0.35f),
+        targetValue = if (isOn) AegisPrimaryCyan.copy(alpha = 0.58f) else AegisChampagneGold.copy(alpha = 0.55f),
         animationSpec = tween(durationMillis = 480),
         label = "HeroBorderColor"
     )
     val heroTintBg by animateColorAsState(
-        targetValue = if (isOn) AegisSuccessGreen.copy(alpha = 0.05f) else Color.Transparent,
+        targetValue = if (isOn) AegisPrimaryCyan.copy(alpha = 0.11f) else AegisChampagneGold.copy(alpha = 0.10f),
         animationSpec = tween(durationMillis = 480),
         label = "HeroTintBackground"
     )
     val powerIconBg by animateColorAsState(
-        targetValue = if (isOn) AegisPrimaryCyan.copy(alpha = 0.14f) else AegisTextMuted.copy(alpha = 0.12f),
+        targetValue = if (isOn) AegisPrimaryCyan else AegisPurple,
         animationSpec = tween(durationMillis = 360),
         label = "PowerIconBg"
     )
     val powerIconTint by animateColorAsState(
-        targetValue = if (isOn) AegisPrimaryCyan else AegisTextMuted,
+        targetValue = AegisOnPrimaryWhite,
         animationSpec = tween(durationMillis = 360),
         label = "PowerIconTint"
     )
@@ -225,6 +232,7 @@ fun DashboardScreen(
                 item {
                     CyberCard(
                         borderColor = heroBorderColor,
+                        tone = CyberCardTone.HERO,
                         modifier = Modifier.graphicsLayer {
                             scaleX = cardPulseScale.value
                             scaleY = cardPulseScale.value
@@ -233,9 +241,13 @@ fun DashboardScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(heroTintBg)
-                                .padding(2.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(heroTintBg, AegisLavenderSoft.copy(alpha = 0.45f))
+                                    )
+                                )
+                                .padding(10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -260,8 +272,8 @@ fun DashboardScreen(
                                     StatusPill(
                                         label = if (isOn) "PROTECTION ACTIVE" else "SHIELD STANDBY",
                                         isActive = isOn,
-                                        activeColor = AegisSuccessGreen,
-                                        inactiveColor = AegisTextMuted
+                                        activeColor = AegisPrimaryCyan,
+                                        inactiveColor = AegisChampagneGold
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     AnimatedContent(
@@ -358,8 +370,8 @@ fun DashboardScreen(
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = AegisOnPrimaryWhite,
                                         checkedTrackColor = AegisPrimaryCyan,
-                                        uncheckedThumbColor = AegisTextMuted,
-                                        uncheckedTrackColor = AegisCardBorder
+                                        uncheckedThumbColor = AegisOnPrimaryWhite,
+                                        uncheckedTrackColor = AegisLavenderLight.copy(alpha = 0.55f)
                                     )
                                 )
                             }
@@ -378,6 +390,7 @@ fun DashboardScreen(
                             telemetry = telemetry,
                             modelManager = modelManager,
                             onModelUpdated = onModelUpdated,
+                            cardTone = CyberCardTone.GOLD,
                             onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() },
                             onRequireAuth = { label, action ->
                                 masterKeyGate.request(label) { action() }
@@ -393,6 +406,7 @@ fun DashboardScreen(
                         modelManager = modelManager,
                         sensitivity = sensitivity,
                         isStrictEverything = isStrictEverything,
+                        cardTone = CyberCardTone.LAVENDER,
                         onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() }
                     )
                 }
@@ -401,7 +415,7 @@ fun DashboardScreen(
             if (showOverlayWarningDialog) {
                 AlertDialog(
                     onDismissRequest = { showOverlayWarningDialog = false },
-                    containerColor = AegisCardBackground,
+                    containerColor = AegisLavenderSoft,
                     titleContentColor = AegisTextPrimary,
                     textContentColor = AegisTextSecondary,
                     title = { Text("Overlay Permission Required", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
@@ -422,7 +436,7 @@ fun DashboardScreen(
                                     context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)
+                            colors = ButtonDefaults.buttonColors(containerColor = AegisPurple, contentColor = AegisOnPrimaryWhite)
                         ) {
                             Text("GRANT PERMISSION", fontWeight = FontWeight.Bold)
                         }
@@ -430,9 +444,12 @@ fun DashboardScreen(
                     dismissButton = {
                         OutlinedButton(
                             onClick = { showOverlayWarningDialog = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisTextSecondary)
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AegisCardBackground,
+                                contentColor = AegisTextPrimary
+                            )
                         ) {
-                            Text("CANCEL")
+                            Text("CANCEL", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 )
@@ -441,7 +458,7 @@ fun DashboardScreen(
             if (showMissingModelDialog) {
                 AlertDialog(
                     onDismissRequest = { showMissingModelDialog = false },
-                    containerColor = AegisCardBackground,
+                    containerColor = AegisChampagneSoft,
                     titleContentColor = AegisTextPrimary,
                     textContentColor = AegisTextSecondary,
                     title = { Text("No AI Model Loaded", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
@@ -469,9 +486,12 @@ fun DashboardScreen(
                                 showMissingModelDialog = false
                                 onRequestStartProtection()
                             },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisWarningAmber)
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AegisLavenderSoft,
+                                contentColor = AegisPurple
+                            )
                         ) {
-                            Text("CAPTURE ONLY")
+                            Text("CAPTURE ONLY", fontWeight = FontWeight.Bold)
                         }
                     }
                 )

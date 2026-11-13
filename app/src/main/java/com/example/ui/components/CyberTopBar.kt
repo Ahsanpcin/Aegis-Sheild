@@ -35,8 +35,10 @@ import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisTextMuted
+import com.example.ui.theme.AegisPurple
+import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
@@ -49,21 +51,30 @@ fun CyberTopBar(
     onNavigateBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    Column {
+    Column(
+        modifier = Modifier.background(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    AegisSecondaryBackground,
+                    AegisLavenderSoft
+                )
+            )
+        )
+    ) {
         TopAppBar(
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (onNavigateBack == null) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(38.dp)
                                 .clip(CircleShape)
                                 .background(
                                     brush = Brush.linearGradient(
-                                        colors = listOf(AegisPrimaryCyan, AegisElectricBlue)
+                                        colors = listOf(AegisPrimaryCyan, AegisPurple)
                                     )
                                 )
-                                .border(1.5.dp, AegisChampagneGold.copy(alpha = 0.7f), CircleShape),
+                                .border(1.5.dp, AegisChampagneGold, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -87,7 +98,7 @@ fun CyberTopBar(
                         if (subtitle != null) {
                             Text(
                                 text = subtitle.uppercase(),
-                                color = AegisChampagneGold,
+                                color = AegisPurple,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = ClassicalBodyFont,
@@ -113,22 +124,22 @@ fun CyberTopBar(
             },
             actions = actions,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = AegisCardBackground.copy(alpha = 0.94f),
+                containerColor = Color.Transparent,
                 titleContentColor = AegisTextPrimary,
                 actionIconContentColor = AegisPrimaryCyan
             )
         )
-        // Subtle Champagne Gold & Sapphire hairline rule
+        // Vibrant 3-color gradient divider
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp)
+                .height(2.dp)
                 .background(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
-                            AegisChampagneGold.copy(alpha = 0.45f),
-                            AegisCardBorder,
-                            AegisChampagneGold.copy(alpha = 0.25f)
+                            AegisPrimaryCyan.copy(alpha = 0.70f),
+                            AegisPurple.copy(alpha = 0.65f),
+                            AegisChampagneGold.copy(alpha = 0.85f)
                         )
                     )
                 )

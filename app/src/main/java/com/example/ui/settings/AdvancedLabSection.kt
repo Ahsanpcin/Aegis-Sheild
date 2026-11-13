@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -59,13 +60,22 @@ import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
 import com.example.data.preferences.AegisPreferences
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.rememberMasterKeyGate
+import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisGoldBright
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
@@ -88,7 +98,8 @@ fun AppVersionSecretCard(
     val remainingTaps = (7 - versionTapCount).coerceAtLeast(0)
 
     CyberCard(
-        borderColor = if (isUnlocked) AegisChampagneGold.copy(alpha = 0.65f) else AegisCardBorder,
+        borderColor = if (isUnlocked) AegisGoldBorder else AegisCardBorder,
+        tone = if (isUnlocked) CyberCardTone.GOLD else CyberCardTone.SKY,
         modifier = Modifier
             .clickable {
                 if (isUnlocked) {
@@ -127,18 +138,23 @@ fun AppVersionSecretCard(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(42.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (isUnlocked) AegisChampagneGold.copy(alpha = 0.16f)
-                            else AegisPrimaryCyan.copy(alpha = 0.10f)
+                            brush = Brush.linearGradient(
+                                colors = if (isUnlocked) {
+                                    listOf(AegisChampagneGold, AegisGoldBright)
+                                } else {
+                                    listOf(AegisPrimaryCyan, AegisPurple)
+                                }
+                            )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isUnlocked) Icons.Default.Tune else Icons.Default.Verified,
                         contentDescription = "App Version",
-                        tint = if (isUnlocked) AegisChampagneGold else AegisPrimaryCyan,
+                        tint = AegisOnPrimaryWhite,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -215,7 +231,7 @@ fun AdvancedPrecisionLabSection(
             LuxurySectionHeader(title = "Advanced Precision Lab", accentColor = AegisChampagneGold)
 
             // 1. Exact Lockdown Duration Specificity (Hours + Minutes + Multiplier)
-            CyberCard(borderColor = AegisChampagneGold.copy(alpha = 0.50f)) {
+            CyberCard(borderColor = AegisGoldBorder, tone = CyberCardTone.GOLD) {
                 val stage1Formatted = AegisPreferences.formatMinutesLabel(lockdownDurationMinutes)
                 val doubleFormatted = AegisPreferences.formatMinutesLabel(
                     (lockdownDurationMinutes * doubleTimeMultiplier).toInt().coerceAtLeast(1)
@@ -244,8 +260,8 @@ fun AdvancedPrecisionLabSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(AegisSurfaceElevated)
-                        .border(1.dp, AegisChampagneGold.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                        .background(AegisLavenderSoft.copy(alpha = 0.78f))
+                        .border(1.dp, AegisLavenderBorder, RoundedCornerShape(12.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -435,12 +451,12 @@ fun AdvancedPrecisionLabSection(
             }
 
             // 2. AI Threshold & Consecutive Frame Specificity
-            CyberCard(borderColor = AegisPrimaryCyan.copy(alpha = 0.35f)) {
+            CyberCard(borderColor = AegisLavenderBorder, tone = CyberCardTone.LAVENDER) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = null,
-                        tint = AegisPrimaryCyan,
+                        tint = AegisPurple,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -574,7 +590,7 @@ fun AdvancedPrecisionLabSection(
             }
 
             // 3. Scan Speed & VirtualDisplay Resolution
-            CyberCard(borderColor = AegisCardBorder) {
+            CyberCard(borderColor = AegisCardBorder, tone = CyberCardTone.SKY) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Speed,
@@ -657,12 +673,12 @@ fun AdvancedPrecisionLabSection(
             }
 
             // 4. Lockdown Behavior & Guardian Bypass Window
-            CyberCard(borderColor = AegisCardBorder) {
+            CyberCard(borderColor = AegisLavenderBorder, tone = CyberCardTone.HERO) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Build,
                         contentDescription = null,
-                        tint = AegisPrimaryCyan,
+                        tint = AegisPurple,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -789,10 +805,10 @@ private fun LabChip(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) AegisPrimaryCyan else AegisSurfaceElevated)
+            .background(if (selected) AegisPurple else AegisCardBackground)
             .border(
                 1.dp,
-                if (selected) AegisPrimaryCyan else AegisCardBorder,
+                if (selected) AegisPurple else AegisLavenderBorder,
                 RoundedCornerShape(10.dp)
             )
             .clickable(onClick = onClick)
@@ -801,7 +817,7 @@ private fun LabChip(
     ) {
         Text(
             text = label,
-            color = if (selected) AegisOnPrimaryWhite else AegisTextSecondary,
+            color = if (selected) AegisOnPrimaryWhite else AegisTextPrimary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = ClassicalBodyFont

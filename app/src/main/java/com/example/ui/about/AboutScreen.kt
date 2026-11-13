@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.preferences.AegisPreferences
 import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.SheildlenzBackdrop
@@ -58,7 +60,13 @@ import com.example.ui.settings.AdvancedPrecisionLabSection
 import com.example.ui.settings.AppVersionSecretCard
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisGoldBright
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
@@ -134,20 +142,27 @@ fun AboutScreen(
                 item {
                     LuxurySectionHeader(title = "Developer", accentColor = AegisChampagneGold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    CyberCard(borderColor = AegisChampagneGold.copy(alpha = 0.45f)) {
+                    CyberCard(
+                        borderColor = AegisGoldBorder,
+                        tone = CyberCardTone.HERO
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(38.dp)
+                                    .size(40.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(AegisPrimaryCyan.copy(alpha = 0.12f)),
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(AegisChampagneGold, AegisPurple)
+                                        )
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = AegisPrimaryCyan,
-                                    modifier = Modifier.size(19.dp)
+                                    tint = AegisOnPrimaryWhite,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(12.dp))
@@ -163,7 +178,7 @@ fun AboutScreen(
                                     text = "Creator of Sheildlenz • 100% Offline Guard",
                                     color = AegisChampagneGold,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = FontWeight.Bold,
                                     fontFamily = ClassicalBodyFont
                                 )
                             }
@@ -182,13 +197,28 @@ fun AboutScreen(
 
                 // 3. FAQs & Q/Answers Widget
                 item {
-                    LuxurySectionHeader(title = "FAQs & Q/A")
+                    LuxurySectionHeader(title = "FAQs & Q/A", accentColor = AegisPurple)
                 }
 
                 itemsIndexed(SheildlenzFaqs) { index, faq ->
                     val isExpanded = expandedFaqIndex == index
+                    val faqTone = when {
+                        index % 3 == 0 -> CyberCardTone.LAVENDER
+                        index % 3 == 1 -> CyberCardTone.SKY
+                        else -> CyberCardTone.GOLD
+                    }
+                    val faqAccent = when (faqTone) {
+                        CyberCardTone.LAVENDER -> AegisPurple
+                        CyberCardTone.GOLD -> AegisChampagneGold
+                        else -> AegisPrimaryCyan
+                    }
                     CyberCard(
-                        borderColor = if (isExpanded) AegisPrimaryCyan.copy(alpha = 0.45f) else AegisCardBorder,
+                        borderColor = when (faqTone) {
+                            CyberCardTone.LAVENDER -> AegisLavenderBorder
+                            CyberCardTone.GOLD -> AegisGoldBorder
+                            else -> AegisCardBorder
+                        },
+                        tone = faqTone,
                         modifier = Modifier.testTag("about_faq_item_$index")
                     ) {
                         Column(
@@ -213,17 +243,16 @@ fun AboutScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(AegisSurfaceElevated)
-                                            .border(1.dp, AegisCardBorder, RoundedCornerShape(8.dp)),
+                                            .size(30.dp)
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .background(faqAccent),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                                             contentDescription = null,
-                                            tint = AegisPrimaryCyan,
-                                            modifier = Modifier.size(15.dp)
+                                            tint = AegisOnPrimaryWhite,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
@@ -240,7 +269,7 @@ fun AboutScreen(
                                 Icon(
                                     imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                     contentDescription = if (isExpanded) "Collapse answer" else "Expand answer",
-                                    tint = AegisPrimaryCyan
+                                    tint = faqAccent
                                 )
                             }
 
@@ -251,7 +280,7 @@ fun AboutScreen(
                             ) {
                                 Column {
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.55f))
+                                    HorizontalDivider(color = faqAccent.copy(alpha = 0.35f))
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = "A: ${faq.answer}",

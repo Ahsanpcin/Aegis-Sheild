@@ -85,8 +85,8 @@ fun StatusPill(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.10f))
-            .border(1.dp, color.copy(alpha = 0.30f), RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.16f))
+            .border(1.2.dp, color.copy(alpha = 0.45f), RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -98,7 +98,7 @@ fun StatusPill(
                     scaleY = dotScale
                 }
                 .clip(CircleShape)
-                .background(color.copy(alpha = if (isActive) 0.24f * dotAlpha else 0.14f)),
+                .background(color.copy(alpha = if (isActive) 0.30f * dotAlpha else 0.18f)),
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -135,10 +135,10 @@ fun ThreatCategoryBadge(
     modifier: Modifier = Modifier
 ) {
     val (color, text) = when (category) {
-        ThreatCategory.EXPLICIT_ADULT -> Pair(AegisDangerRed, "EXPLICIT ADULT")
-        ThreatCategory.SUGGESTIVE_CONTENT -> Pair(AegisChampagneGold, "SUGGESTIVE")
+        ThreatCategory.EXPLICIT_ADULT -> Pair(AegisChampagneGold, "EXPLICIT ADULT")
+        ThreatCategory.SUGGESTIVE_CONTENT -> Pair(com.example.ui.theme.AegisPurple, "SUGGESTIVE")
         ThreatCategory.SENSITIVE_GRAPHIC -> Pair(AegisPrimaryCyan, "GRAPHIC / VIOLENT")
-        ThreatCategory.BENIGN_SAFE -> Pair(AegisSuccessGreen, "SAFE")
+        ThreatCategory.BENIGN_SAFE -> Pair(AegisElectricBlue, "SAFE")
     }
 
     Text(
@@ -150,8 +150,8 @@ fun ThreatCategoryBadge(
         letterSpacing = 0.7.sp,
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.11f))
-            .border(1.dp, color.copy(alpha = 0.32f), RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.16f))
+            .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     )
 }
@@ -162,10 +162,10 @@ fun SeverityTag(
     modifier: Modifier = Modifier
 ) {
     val color = when (severity) {
-        ThreatSeverity.CRITICAL -> AegisDangerRed
+        ThreatSeverity.CRITICAL -> AegisChampagneGold
         ThreatSeverity.HIGH -> AegisWarningAmber
-        ThreatSeverity.MEDIUM -> AegisChampagneGold
-        ThreatSeverity.LOW -> AegisElectricBlue
+        ThreatSeverity.MEDIUM -> com.example.ui.theme.AegisPurple
+        ThreatSeverity.LOW -> AegisPrimaryCyan
     }
 
     Text(
@@ -177,8 +177,8 @@ fun SeverityTag(
         letterSpacing = 0.6.sp,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.11f))
-            .border(1.dp, color.copy(alpha = 0.26f), RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.16f))
+            .border(1.dp, color.copy(alpha = 0.38f), RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 3.dp)
     )
 }

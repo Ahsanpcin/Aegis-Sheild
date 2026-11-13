@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -51,13 +52,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.permissions.PermissionHelper
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
@@ -223,7 +229,21 @@ fun PermissionExplainerCard(
     onAction: () -> Unit,
     isInformationalOnly: Boolean = false
 ) {
-    CyberCard(borderColor = if (isGranted) AegisSuccessGreen.copy(alpha = 0.4f) else accentColor.copy(alpha = 0.28f)) {
+    val cardTone = when (accentColor) {
+        AegisPurple -> CyberCardTone.LAVENDER
+        AegisChampagneGold, AegisDangerRed -> CyberCardTone.GOLD
+        else -> CyberCardTone.SKY
+    }
+    val cardBorder = when (cardTone) {
+        CyberCardTone.LAVENDER -> AegisLavenderBorder
+        CyberCardTone.GOLD -> AegisGoldBorder
+        else -> AegisCardBorder
+    }
+
+    CyberCard(
+        borderColor = cardBorder,
+        tone = cardTone
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -232,13 +252,16 @@ fun PermissionExplainerCard(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(38.dp)
                         .clip(RoundedCornerShape(11.dp))
-                        .background(accentColor.copy(alpha = 0.12f))
-                        .border(1.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(11.dp)),
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(accentColor, accentColor.copy(alpha = 0.72f))
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(imageVector = icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = icon, contentDescription = null, tint = AegisOnPrimaryWhite, modifier = Modifier.size(19.dp))
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
@@ -254,7 +277,7 @@ fun PermissionExplainerCard(
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Granted",
-                    tint = AegisSuccessGreen,
+                    tint = AegisPrimaryCyan,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -276,13 +299,13 @@ fun PermissionExplainerCard(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(AegisSuccessGreen.copy(alpha = 0.12f))
-                    .border(1.dp, AegisSuccessGreen.copy(alpha = 0.30f), RoundedCornerShape(50))
+                    .background(AegisPrimaryCyan.copy(alpha = 0.14f))
+                    .border(1.dp, AegisPrimaryCyan.copy(alpha = 0.35f), RoundedCornerShape(50))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
                     text = "ACTIVE & CONFIGURED",
-                    color = AegisSuccessGreen,
+                    color = AegisPrimaryCyan,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = ClassicalBodyFont,
@@ -293,8 +316,8 @@ fun PermissionExplainerCard(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(accentColor.copy(alpha = 0.12f))
-                    .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(50))
+                    .background(accentColor.copy(alpha = 0.14f))
+                    .border(1.dp, accentColor.copy(alpha = 0.32f), RoundedCornerShape(50))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
@@ -307,10 +330,13 @@ fun PermissionExplainerCard(
                 )
             }
         } else {
-            OutlinedButton(
+            Button(
                 onClick = onAction,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = AegisOnPrimaryWhite
+                ),
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Text(

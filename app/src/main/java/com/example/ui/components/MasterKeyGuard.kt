@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,6 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -38,11 +41,17 @@ import androidx.compose.ui.unit.sp
 import com.example.data.preferences.AegisPreferences
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
+import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
+import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 
@@ -113,17 +122,29 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
 
         AlertDialog(
             onDismissRequest = { state.dismiss() },
-            containerColor = AegisCardBackground,
+            containerColor = AegisLavenderSoft,
             titleContentColor = AegisTextPrimary,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        tint = AegisPrimaryCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(AegisChampagneGold, AegisPurple)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            tint = AegisOnPrimaryWhite,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (hasGuardianPin) "Master Key Required" else "Create Master Key",
                         fontFamily = ClassicalDisplayFont,
@@ -159,8 +180,10 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
                         shape = RoundedCornerShape(12.dp),
                         isError = keyError != null,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AegisPrimaryCyan,
-                            unfocusedBorderColor = AegisCardBorder,
+                            focusedBorderColor = AegisPurple,
+                            unfocusedBorderColor = AegisLavenderBorder,
+                            focusedContainerColor = AegisCardBackground,
+                            unfocusedContainerColor = AegisCardBackground,
                             focusedTextColor = AegisTextPrimary,
                             unfocusedTextColor = AegisTextPrimary
                         ),
@@ -171,8 +194,9 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
                     if (keyError != null) {
                         Text(
                             text = keyError!!,
-                            color = AegisDangerRed,
+                            color = AegisWarningAmber,
                             fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
                             fontFamily = ClassicalBodyFont,
                             modifier = Modifier.padding(top = 6.dp)
                         )
@@ -189,7 +213,7 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AegisPrimaryCyan,
+                        containerColor = AegisPurple,
                         contentColor = AegisOnPrimaryWhite
                     ),
                     modifier = Modifier.testTag("master_key_prompt_confirm")
@@ -203,10 +227,13 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
             dismissButton = {
                 OutlinedButton(
                     onClick = { state.dismiss() },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisTextSecondary),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = AegisChampagneSoft,
+                        contentColor = AegisTextPrimary
+                    ),
                     modifier = Modifier.testTag("master_key_prompt_cancel")
                 ) {
-                    Text("CANCEL")
+                    Text("CANCEL", fontWeight = FontWeight.SemiBold)
                 }
             }
         )

@@ -41,16 +41,19 @@ import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
+import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
-import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisLavenderBorder
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisSuccessGreen
-import com.example.ui.theme.AegisTextMuted
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
+import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 
@@ -98,8 +101,8 @@ fun GuardianGateScreen(
                 StatusPill(
                     label = if (telemetry.isProtectionEnabled) "PROTECTION ARMED" else "SHIELD STANDBY",
                     isActive = telemetry.isProtectionEnabled,
-                    activeColor = AegisSuccessGreen,
-                    inactiveColor = AegisTextMuted
+                    activeColor = AegisPrimaryCyan,
+                    inactiveColor = AegisChampagneGold
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -127,7 +130,10 @@ fun GuardianGateScreen(
                     modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
                 )
 
-                CyberCard(borderColor = AegisPrimaryCyan.copy(alpha = 0.25f)) {
+                CyberCard(
+                    borderColor = AegisLavenderBorder,
+                    tone = CyberCardTone.HERO
+                ) {
                     OutlinedTextField(
                         value = pinInput,
                         onValueChange = {
@@ -143,7 +149,7 @@ fun GuardianGateScreen(
                             )
                         },
                         leadingIcon = {
-                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan)
+                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPurple)
                         },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
@@ -151,8 +157,10 @@ fun GuardianGateScreen(
                         shape = RoundedCornerShape(14.dp),
                         isError = pinError != null,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AegisPrimaryCyan,
+                            focusedBorderColor = AegisPurple,
                             unfocusedBorderColor = AegisCardBorder,
+                            focusedContainerColor = AegisCardBackground,
+                            unfocusedContainerColor = AegisCardBackground,
                             focusedTextColor = AegisTextPrimary,
                             unfocusedTextColor = AegisTextPrimary
                         ),
@@ -175,7 +183,7 @@ fun GuardianGateScreen(
                                 Text("Confirm Guardian Password", fontFamily = ClassicalBodyFont)
                             },
                             leadingIcon = {
-                                Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan)
+                                Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPurple)
                             },
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
@@ -183,8 +191,10 @@ fun GuardianGateScreen(
                             shape = RoundedCornerShape(14.dp),
                             isError = pinError != null,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AegisPrimaryCyan,
+                                focusedBorderColor = AegisPurple,
                                 unfocusedBorderColor = AegisCardBorder,
+                                focusedContainerColor = AegisCardBackground,
+                                unfocusedContainerColor = AegisCardBackground,
                                 focusedTextColor = AegisTextPrimary,
                                 unfocusedTextColor = AegisTextPrimary
                             ),
@@ -197,8 +207,9 @@ fun GuardianGateScreen(
                     if (pinError != null) {
                         Text(
                             text = pinError!!,
-                            color = AegisDangerRed,
+                            color = AegisWarningAmber,
                             fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
                             fontFamily = ClassicalBodyFont,
                             modifier = Modifier.padding(top = 8.dp)
                         )
@@ -233,7 +244,7 @@ fun GuardianGateScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AegisPrimaryCyan,
+                            containerColor = AegisPurple,
                             contentColor = AegisOnPrimaryWhite
                         ),
                         shape = RoundedCornerShape(14.dp),

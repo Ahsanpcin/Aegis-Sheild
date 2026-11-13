@@ -256,14 +256,17 @@ fun AegisShieldGraphic(
                 close()
             }
 
-            // Luminous Pearl-Porcelain Shield Interior
+            // Luminous Sky-Lavender Satin Shield Interior (no plain white fill)
             drawPath(
                 path = shieldPath,
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White,
-                        if (isThreatActive) AegisChampagneSoft else AegisSecondaryBackground
-                    )
+                    colors = if (isThreatActive) {
+                        listOf(AegisChampagneSoft, Color(0xFFFFDE99))
+                    } else if (isProtected) {
+                        listOf(Color(0xFFDCEBFF), Color(0xFFE3D8FF))
+                    } else {
+                        listOf(Color(0xFFE8F2FF), AegisSecondaryBackground)
+                    }
                 )
             )
 

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="sheildlenz_sky_blue">#FF2B6CE6</color>
-    <color name="sheildlenz_champagne_gold">#FFD99B26</color>
-    <color name="sheildlenz_canvas_light">#FFF7FAFF</color>
-    <color name="sheildlenz_ink_blue">#FF1E4494</color>
+    <color name="sheildlenz_sky_blue">#FF2563EB</color>
+    <color name="sheildlenz_orchid_lavender">#FF7C5CFA</color>
+    <color name="sheildlenz_sunlit_gold">#FFE59712</color>
+    <color name="sheildlenz_canvas_light">#FFDCEBFF</color>
+    <color name="sheildlenz_ink_blue">#FF1A3673</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

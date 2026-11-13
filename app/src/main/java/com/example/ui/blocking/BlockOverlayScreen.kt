@@ -63,13 +63,18 @@ import com.example.data.preferences.AegisPreferences
 import com.example.services.protection.AegisLockdownService
 import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
@@ -115,8 +120,8 @@ fun BlockOverlayScreen(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         AegisVoidBackground,
-                        AegisChampagneSoft,
-                        AegisVoidBackground
+                        AegisLavenderSoft,
+                        AegisChampagneSoft
                     )
                 )
             )
@@ -188,7 +193,10 @@ fun BlockOverlayScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.25f)) {
+            CyberCard(
+                borderColor = AegisGoldBorder,
+                tone = CyberCardTone.GOLD
+            ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Visual content matching ${category.displayName} was identified on the active display. The screen has been obscured to uphold protection policies.",
@@ -213,7 +221,7 @@ fun BlockOverlayScreen(
 
                     Text(
                         text = "POLICY: Master Code or ${doubleTimeLabel.uppercase()} Double-Time Wait • Shield Remains ON",
-                        color = AegisSuccessGreen,
+                        color = AegisPrimaryCyan,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = ClassicalBodyFont,
@@ -238,7 +246,7 @@ fun BlockOverlayScreen(
                     .height(50.dp)
                     .testTag("block_screen_return_home_button"),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AegisDangerRed,
+                    containerColor = AegisPrimaryCyan,
                     contentColor = AegisOnPrimaryWhite
                 ),
                 shape = RoundedCornerShape(14.dp)
@@ -256,7 +264,7 @@ fun BlockOverlayScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedButton(
+            Button(
                 onClick = {
                     pinInput = ""
                     pinError = null
@@ -266,8 +274,9 @@ fun BlockOverlayScreen(
                     .fillMaxWidth()
                     .height(48.dp)
                     .testTag("block_screen_guardian_override_button"),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = AegisPrimaryCyan
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AegisLavenderSoft,
+                    contentColor = AegisPurple
                 ),
                 shape = RoundedCornerShape(14.dp)
             ) {
@@ -288,7 +297,7 @@ fun BlockOverlayScreen(
         if (showPinDialog) {
             AlertDialog(
                 onDismissRequest = { showPinDialog = false },
-                containerColor = AegisCardBackground,
+                containerColor = AegisLavenderSoft,
                 titleContentColor = AegisTextPrimary,
                 title = { Text("Master Code Verification", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
                 text = {

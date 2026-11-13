@@ -36,10 +36,20 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisElectricBlue
-import com.example.ui.theme.AegisOpticalTeal
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisGoldBright
+import com.example.ui.theme.AegisGoldDeepTint
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisLavenderSoft
+import com.example.ui.theme.AegisLavenderSurface
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisSurfaceElevated
+import com.example.ui.theme.AegisPurple
+import com.example.ui.theme.AegisSecondaryBackground
+import com.example.ui.theme.AegisSkySoft
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
@@ -47,8 +57,15 @@ import com.example.ui.theme.AegisVoidBackground
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 
+enum class CyberCardTone {
+    SKY,
+    LAVENDER,
+    GOLD,
+    HERO
+}
+
 /**
- * Atmospheric luxury silk-porcelain backdrop with delicate radial sapphire and gold halos.
+ * Luminous 3-color gradient atmosphere blending Sky Azure, Orchid Lavender, and Sunlit Gold.
  */
 @Composable
 fun SheildlenzBackdrop(
@@ -63,46 +80,46 @@ fun SheildlenzBackdrop(
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFFFFFFF),
-                            AegisVoidBackground,
-                            Color(0xFFEEF4FF)
+                            Color(0xFFD2E5FF), // Sky Azure Mist
+                            Color(0xFFE1E8FF), // Periwinkle Blend
+                            Color(0xFFECE2FF)  // Soft Orchid Lavender
                         )
                     )
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisElectricBlue.copy(alpha = 0.08f),
+                            AegisElectricBlue.copy(alpha = 0.22f),
                             Color.Transparent
                         ),
-                        center = Offset(size.width * 0.85f, size.height * 0.08f),
+                        center = Offset(size.width * 0.88f, size.height * 0.08f),
                         radius = size.width * 0.72f
                     ),
                     radius = size.width * 0.72f,
-                    center = Offset(size.width * 0.85f, size.height * 0.08f)
+                    center = Offset(size.width * 0.88f, size.height * 0.08f)
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisPrimaryCyan.copy(alpha = 0.06f),
+                            AegisPurple.copy(alpha = 0.16f),
                             Color.Transparent
                         ),
-                        center = Offset(size.width * 0.12f, size.height * 0.36f),
-                        radius = size.width * 0.60f
+                        center = Offset(size.width * 0.10f, size.height * 0.42f),
+                        radius = size.width * 0.65f
                     ),
-                    radius = size.width * 0.60f,
-                    center = Offset(size.width * 0.12f, size.height * 0.36f)
+                    radius = size.width * 0.65f,
+                    center = Offset(size.width * 0.10f, size.height * 0.42f)
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisChampagneGold.copy(alpha = 0.09f),
+                            AegisGoldBright.copy(alpha = 0.20f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.78f, size.height * 0.88f),
-                        radius = size.width * 0.55f
+                        radius = size.width * 0.58f
                     ),
-                    radius = size.width * 0.55f,
+                    radius = size.width * 0.58f,
                     center = Offset(size.width * 0.78f, size.height * 0.88f)
                 )
             },
@@ -114,37 +131,86 @@ fun SheildlenzBackdrop(
 fun CyberCard(
     modifier: Modifier = Modifier,
     borderColor: Color = AegisCardBorder,
+    tone: CyberCardTone? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val resolvedTone = tone ?: when {
+        borderColor == AegisChampagneGold || borderColor.red > 0.75f && borderColor.green > 0.45f && borderColor.blue < 0.35f -> CyberCardTone.GOLD
+        borderColor == AegisPurple || borderColor == AegisLavenderBorder || (borderColor.blue > 0.80f && borderColor.red > 0.42f && borderColor.green < 0.48f) -> CyberCardTone.LAVENDER
+        else -> CyberCardTone.SKY
+    }
+
+    val (gradientColors, resolvedBorder, accentStripeColors, shadowTint) = when (resolvedTone) {
+        CyberCardTone.SKY -> Quad(
+            listOf(AegisCardBackground, AegisSkySoft),
+            if (borderColor == AegisCardBorder) AegisCardBorder else borderColor,
+            listOf(AegisPrimaryCyan, AegisElectricBlue),
+            AegisPrimaryCyan.copy(alpha = 0.16f)
+        )
+        CyberCardTone.LAVENDER -> Quad(
+            listOf(AegisLavenderSoft, AegisLavenderSurface),
+            AegisLavenderBorder,
+            listOf(AegisPurple, AegisLavenderLight),
+            AegisPurple.copy(alpha = 0.16f)
+        )
+        CyberCardTone.GOLD -> Quad(
+            listOf(AegisChampagneSoft, AegisGoldDeepTint),
+            AegisGoldBorder,
+            listOf(AegisChampagneGold, AegisGoldBright),
+            AegisChampagneGold.copy(alpha = 0.18f)
+        )
+        CyberCardTone.HERO -> Quad(
+            listOf(AegisCardBackground, AegisLavenderSoft, AegisChampagneSoft.copy(alpha = 0.85f)),
+            AegisCardBorder,
+            listOf(AegisPrimaryCyan, AegisPurple, AegisChampagneGold),
+            AegisPurple.copy(alpha = 0.18f)
+        )
+    }
+
     val shape = RoundedCornerShape(22.dp)
-    val borderBrush = Brush.verticalGradient(
+    val borderBrush = Brush.linearGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.95f),
-            borderColor
+            Color.White.copy(alpha = 0.85f),
+            resolvedBorder
         )
     )
     val cardModifier = modifier
         .fillMaxWidth()
         .shadow(
-            elevation = 6.dp,
+            elevation = 8.dp,
             shape = shape,
-            ambientColor = AegisElectricBlue.copy(alpha = 0.08f),
-            spotColor = AegisPrimaryCyan.copy(alpha = 0.10f)
+            ambientColor = shadowTint,
+            spotColor = shadowTint
         )
         .clip(shape)
-        .background(
-            brush = Brush.verticalGradient(
-                colors = listOf(AegisCardBackground, AegisSurfaceElevated)
-            )
-        )
-        .border(BorderStroke(1.dp, borderBrush), shape)
-        .border(BorderStroke(0.5.dp, borderColor.copy(alpha = 0.7f)), shape)
+        .background(brush = Brush.verticalGradient(colors = gradientColors))
+        .border(BorderStroke(1.2.dp, borderBrush), shape)
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-        .padding(18.dp)
 
-    Column(modifier = cardModifier, content = content)
+    Column(modifier = cardModifier) {
+        // Vibrant 3-color style top accent bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.5.dp)
+                .background(brush = Brush.horizontalGradient(colors = accentStripeColors))
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            content = content
+        )
+    }
 }
+
+private data class Quad<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
 
 @Composable
 fun LuxurySectionHeader(
@@ -158,15 +224,19 @@ fun LuxurySectionHeader(
     ) {
         Box(
             modifier = Modifier
-                .width(18.dp)
-                .height(2.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(accentColor)
+                .width(22.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(accentColor, AegisPrimaryCyan)
+                    )
+                )
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = title.uppercase(),
-            color = AegisTextSecondary,
+            color = AegisTextPrimary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = ClassicalBodyFont,
@@ -184,7 +254,16 @@ fun MetricTile(
     modifier: Modifier = Modifier,
     caption: String? = null
 ) {
-    CyberCard(modifier = modifier, borderColor = accentColor.copy(alpha = 0.24f)) {
+    val tileTone = when (accentColor) {
+        AegisPurple, AegisLavenderLight -> CyberCardTone.LAVENDER
+        AegisChampagneGold, AegisGoldBright -> CyberCardTone.GOLD
+        else -> CyberCardTone.SKY
+    }
+    CyberCard(
+        modifier = modifier,
+        borderColor = accentColor.copy(alpha = 0.45f),
+        tone = tileTone
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -200,16 +279,19 @@ fun MetricTile(
             )
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(accentColor.copy(alpha = 0.10f))
-                    .border(1.dp, accentColor.copy(alpha = 0.20f), RoundedCornerShape(11.dp)),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(accentColor, accentColor.copy(alpha = 0.72f))
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = accentColor,
+                    tint = AegisOnPrimaryWhite,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -234,12 +316,12 @@ fun MetricTile(
         Spacer(modifier = Modifier.height(10.dp))
         Box(
             modifier = Modifier
-                .width(36.dp)
-                .height(3.dp)
+                .width(42.dp)
+                .height(3.5.dp)
                 .clip(RoundedCornerShape(2.dp))
                 .background(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(accentColor, accentColor.copy(alpha = 0.25f))
+                        colors = listOf(accentColor, AegisChampagneGold)
                     )
                 )
         )

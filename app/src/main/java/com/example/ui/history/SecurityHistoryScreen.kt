@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -57,6 +58,7 @@ import com.example.core.models.SecurityIncident
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.SecurityHistoryRepository
 import com.example.ui.components.CyberCard
+import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.MetricTile
@@ -67,7 +69,12 @@ import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisGoldBorder
+import com.example.ui.theme.AegisGoldBright
+import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
@@ -167,7 +174,7 @@ fun SecurityHistoryScreen(
                             title = "Detections",
                             value = totalDetections.toString(),
                             icon = Icons.Default.Security,
-                            accentColor = if (totalDetections > 0) AegisDangerRed else AegisPrimaryCyan,
+                            accentColor = AegisChampagneGold,
                             caption = "Total blocked events",
                             modifier = Modifier.weight(1f)
                         )
@@ -184,7 +191,10 @@ fun SecurityHistoryScreen(
                 }
 
                 item {
-                    CyberCard(borderColor = AegisPurple.copy(alpha = 0.28f)) {
+                    CyberCard(
+                        borderColor = AegisLavenderBorder,
+                        tone = CyberCardTone.LAVENDER
+                    ) {
                         Text(
                             text = "Blocked Applications",
                             color = AegisTextPrimary,
@@ -262,7 +272,10 @@ fun SecurityHistoryScreen(
 
                 if (incidents.isEmpty()) {
                     item {
-                        CyberCard(borderColor = AegisChampagneGold.copy(alpha = 0.35f)) {
+                        CyberCard(
+                            borderColor = AegisGoldBorder,
+                            tone = CyberCardTone.HERO
+                        ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
@@ -272,17 +285,20 @@ fun SecurityHistoryScreen(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(64.dp)
+                                        .size(66.dp)
                                         .clip(CircleShape)
-                                        .background(AegisPrimaryCyan.copy(alpha = 0.08f))
-                                        .border(1.5.dp, AegisChampagneGold.copy(alpha = 0.55f), CircleShape),
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(AegisPrimaryCyan, AegisPurple, AegisChampagneGold)
+                                            )
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Shield,
                                         contentDescription = null,
-                                        tint = AegisPrimaryCyan,
-                                        modifier = Modifier.size(30.dp)
+                                        tint = AegisOnPrimaryWhite,
+                                        modifier = Modifier.size(32.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(14.dp))
@@ -323,7 +339,7 @@ fun SecurityHistoryScreen(
             if (showClearDialog) {
                 AlertDialog(
                     onDismissRequest = { showClearDialog = false },
-                    containerColor = AegisCardBackground,
+                    containerColor = AegisChampagneSoft,
                     titleContentColor = AegisTextPrimary,
                     textContentColor = AegisTextSecondary,
                     title = { Text(text = "Clear Security Audit Log?", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
@@ -342,7 +358,7 @@ fun SecurityHistoryScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = AegisDangerRed,
+                                containerColor = AegisChampagneGold,
                                 contentColor = AegisOnPrimaryWhite
                             )
                         ) {
@@ -352,9 +368,12 @@ fun SecurityHistoryScreen(
                     dismissButton = {
                         OutlinedButton(
                             onClick = { showClearDialog = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisTextSecondary)
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AegisCardBackground,
+                                contentColor = AegisTextPrimary
+                            )
                         ) {
-                            Text(text = "CANCEL")
+                            Text(text = "CANCEL", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 )
@@ -372,8 +391,8 @@ fun IncidentItemCard(
         .format(Date(incident.timestampMillis))
 
     CyberCard(
-        borderColor = if (incident.isReviewedFalsePositive) AegisTextMuted.copy(alpha = 0.28f)
-        else AegisDangerRed.copy(alpha = 0.30f)
+        borderColor = if (incident.isReviewedFalsePositive) AegisCardBorder else AegisGoldBorder,
+        tone = if (incident.isReviewedFalsePositive) CyberCardTone.SKY else CyberCardTone.GOLD
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
