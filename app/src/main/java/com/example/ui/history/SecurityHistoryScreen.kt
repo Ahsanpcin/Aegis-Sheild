@@ -63,6 +63,7 @@ import com.example.ui.components.MetricTile
 import com.example.ui.components.SeverityTag
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.ThreatCategoryBadge
+import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
@@ -92,13 +93,15 @@ private data class BlockedAppSummary(
 
 @Composable
 fun SecurityHistoryScreen(
-    historyRepo: SecurityHistoryRepository
+    historyRepo: SecurityHistoryRepository,
+    preferences: AegisPreferences
 ) {
     val incidents by historyRepo.getIncidents().collectAsState(initial = emptyList())
     val totalDetections by historyRepo.getTotalDetectionsCount().collectAsState(initial = 0)
     val blockedAppCount by historyRepo.getBlockedAppCount().collectAsState(initial = 0)
     val scope = rememberCoroutineScope()
     var showClearDialog by remember { mutableStateOf(false) }
+    val masterKeyGate = rememberMasterKeyGate(preferences)
 
     val blockedAppsBreakdown = remember(incidents) {
         incidents
@@ -125,7 +128,11 @@ fun SecurityHistoryScreen(
                     actions = {
                         if (incidents.isNotEmpty()) {
                             IconButton(
-                                onClick = { showClearDialog = true },
+                                onClick = {
+                                    masterKeyGate.request("clear security history") {
+                                        showClearDialog = true
+                                    }
+                                },
                                 modifier = Modifier.testTag("clear_history_button")
                             ) {
                                 Icon(
@@ -302,8 +309,10 @@ fun SecurityHistoryScreen(
                         IncidentItemCard(
                             incident = incident,
                             onToggleFalsePositive = {
-                                scope.launch {
-                                    historyRepo.markFalsePositive(incident.id, !incident.isReviewedFalsePositive)
+                                masterKeyGate.request("update incident review status") {
+                                    scope.launch {
+                                        historyRepo.markFalsePositive(incident.id, !incident.isReviewedFalsePositive)
+                                    }
                                 }
                             }
                         )

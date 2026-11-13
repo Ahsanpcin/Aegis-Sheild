@@ -63,16 +63,16 @@ fun SheildlenzBackdrop(
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFF9FBFF),
+                            Color(0xFFFCFEFF),
                             AegisVoidBackground,
-                            Color(0xFFECF2FA)
+                            Color(0xFFEAF2FF)
                         )
                     )
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisElectricBlue.copy(alpha = 0.08f),
+                            AegisElectricBlue.copy(alpha = 0.09f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.85f, size.height * 0.08f),
@@ -84,7 +84,7 @@ fun SheildlenzBackdrop(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisOpticalTeal.copy(alpha = 0.06f),
+                            AegisOpticalTeal.copy(alpha = 0.08f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.12f, size.height * 0.36f),
@@ -96,7 +96,7 @@ fun SheildlenzBackdrop(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            AegisChampagneGold.copy(alpha = 0.06f),
+                            AegisChampagneGold.copy(alpha = 0.08f),
                             Color.Transparent
                         ),
                         center = Offset(size.width * 0.78f, size.height * 0.88f),
@@ -120,7 +120,7 @@ fun CyberCard(
     val shape = RoundedCornerShape(22.dp)
     val borderBrush = Brush.verticalGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.9f),
+            Color.White.copy(alpha = 0.95f),
             borderColor
         )
     )
@@ -129,8 +129,8 @@ fun CyberCard(
         .shadow(
             elevation = 6.dp,
             shape = shape,
-            ambientColor = AegisPrimaryCyan.copy(alpha = 0.07f),
-            spotColor = AegisPrimaryCyan.copy(alpha = 0.11f)
+            ambientColor = AegisElectricBlue.copy(alpha = 0.08f),
+            spotColor = AegisPrimaryCyan.copy(alpha = 0.10f)
         )
         .clip(shape)
         .background(

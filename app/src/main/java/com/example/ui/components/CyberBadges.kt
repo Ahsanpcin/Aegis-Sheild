@@ -39,10 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
+import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
-import com.example.ui.theme.AegisPurple
+import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisSuccessGreen
+import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 
@@ -52,7 +54,7 @@ fun StatusPill(
     isActive: Boolean,
     modifier: Modifier = Modifier,
     activeColor: Color = AegisSuccessGreen,
-    inactiveColor: Color = Color(0xFF64748B)
+    inactiveColor: Color = AegisTextMuted
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "PillPulse")
     val dotAlpha by infiniteTransition.animateFloat(
@@ -134,8 +136,8 @@ fun ThreatCategoryBadge(
 ) {
     val (color, text) = when (category) {
         ThreatCategory.EXPLICIT_ADULT -> Pair(AegisDangerRed, "EXPLICIT ADULT")
-        ThreatCategory.SUGGESTIVE_CONTENT -> Pair(AegisWarningAmber, "SUGGESTIVE")
-        ThreatCategory.SENSITIVE_GRAPHIC -> Pair(AegisPurple, "GRAPHIC / VIOLENT")
+        ThreatCategory.SUGGESTIVE_CONTENT -> Pair(AegisChampagneGold, "SUGGESTIVE")
+        ThreatCategory.SENSITIVE_GRAPHIC -> Pair(AegisPrimaryCyan, "GRAPHIC / VIOLENT")
         ThreatCategory.BENIGN_SAFE -> Pair(AegisSuccessGreen, "SAFE")
     }
 
@@ -161,8 +163,8 @@ fun SeverityTag(
 ) {
     val color = when (severity) {
         ThreatSeverity.CRITICAL -> AegisDangerRed
-        ThreatSeverity.HIGH -> Color(0xFFEA580C)
-        ThreatSeverity.MEDIUM -> AegisWarningAmber
+        ThreatSeverity.HIGH -> AegisWarningAmber
+        ThreatSeverity.MEDIUM -> AegisChampagneGold
         ThreatSeverity.LOW -> AegisElectricBlue
     }
 

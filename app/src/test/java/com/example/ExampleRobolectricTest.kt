@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import com.example.ui.components.AHSAN_TCR_CONTACT_DOMAIN
 import com.example.ui.components.AHSAN_TCR_CONTACT_URL
+import com.example.ui.components.MasterKeyGateState
 import com.example.ui.components.openAhsanTcrContact
 import com.example.core.models.SecurityIncident
 import com.example.core.models.SensitivityLevel
@@ -508,5 +509,53 @@ class ExampleRobolectricTest {
         assertEquals(Intent.ACTION_VIEW, startedIntent.action)
         assertEquals("https://ahsantcr.lovable.app", startedIntent.dataString)
         assertTrue((startedIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+    }
+
+    @Test
+    fun `master key gate blocks invalid keys, authorizes valid keys, creates missing key, and handles cancellation`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.removeGuardianPin()
+
+        val gate = MasterKeyGateState(prefs)
+
+        // 1. When no Master Key exists yet, enforce 4-8 digit creation first
+        var executedCount = 0
+        gate.request("turn Shield ON") { executedCount++ }
+        assertEquals("turn Shield ON", gate.pendingActionLabel)
+
+        val shortErr = gate.submitKey("12")
+        assertNotNull(shortErr)
+        assertEquals(0, executedCount)
+        assertFalse(prefs.hasGuardianPin.value)
+
+        val createErr = gate.submitKey("2468")
+        assertEquals(null, createErr)
+        assertEquals(1, executedCount)
+        assertTrue(prefs.hasGuardianPin.value)
+        assertEquals(null, gate.pendingActionLabel)
+
+        // 2. When Master Key exists, reject wrong key and accept right key
+        gate.request("change setting") { executedCount++ }
+        val wrongErr = gate.submitKey("0000")
+        assertEquals("Incorrect Master Key", wrongErr)
+        assertEquals(1, executedCount)
+        assertEquals("change setting", gate.pendingActionLabel)
+
+        val okErr = gate.submitKey("2468")
+        assertEquals(null, okErr)
+        assertEquals(2, executedCount)
+        assertEquals(null, gate.pendingActionLabel)
+
+        // 3. Cancellation invokes onCancel and does not authorize action
+        var cancelledCount = 0
+        gate.request(
+            actionLabel = "update threshold",
+            onCancel = { cancelledCount++ }
+        ) { executedCount++ }
+        gate.dismiss()
+        assertEquals(1, cancelledCount)
+        assertEquals(2, executedCount)
+        assertEquals(null, gate.pendingActionLabel)
     }
 }

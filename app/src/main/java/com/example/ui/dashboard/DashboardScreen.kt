@@ -81,6 +81,7 @@ import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SampleImageTesterCard
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
+import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
@@ -138,8 +139,22 @@ fun DashboardScreen(
         }
     }
 
+    val masterKeyGate = rememberMasterKeyGate(preferences)
+
     // Animated ON/OFF Hero Card Transitions
     val isOn = telemetry.isProtectionEnabled
+
+    val requestShieldToggle: (Boolean) -> Unit = { targetActive ->
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        val actionLabel = if (targetActive) "turn Shield ON" else "turn Shield OFF"
+        masterKeyGate.request(actionLabel) {
+            if (targetActive) {
+                attemptStartProtection()
+            } else {
+                onRequestStopProtection()
+            }
+        }
+    }
     val heroBorderColor by animateColorAsState(
         targetValue = if (isOn) AegisSuccessGreen.copy(alpha = 0.48f) else AegisChampagneGold.copy(alpha = 0.35f),
         animationSpec = tween(durationMillis = 480),
@@ -230,14 +245,7 @@ fun DashboardScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .clickable {
-                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            if (isOn) {
-                                                onRequestStopProtection()
-                                            } else {
-                                                attemptStartProtection()
-                                            }
-                                        }
+                                        .clickable { requestShieldToggle(!isOn) }
                                         .testTag("shield_graphic_toggle"),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -345,20 +353,13 @@ fun DashboardScreen(
 
                                 Switch(
                                     checked = isOn,
-                                    onCheckedChange = { isChecked ->
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        if (isChecked) {
-                                            attemptStartProtection()
-                                        } else {
-                                            onRequestStopProtection()
-                                        }
-                                    },
+                                    onCheckedChange = { isChecked -> requestShieldToggle(isChecked) },
                                     modifier = Modifier.testTag("master_protection_switch"),
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = AegisOnPrimaryWhite,
                                         checkedTrackColor = AegisPrimaryCyan,
                                         uncheckedThumbColor = AegisTextMuted,
-                                        uncheckedTrackColor = Color(0xFFCBD5E1)
+                                        uncheckedTrackColor = AegisCardBorder
                                     )
                                 )
                             }
@@ -376,7 +377,10 @@ fun DashboardScreen(
                         ModelManagerCard(
                             telemetry = telemetry,
                             modelManager = modelManager,
-                            onModelUpdated = onModelUpdated
+                            onModelUpdated = onModelUpdated,
+                            onRequireAuth = { label, action ->
+                                masterKeyGate.request(label) { action() }
+                            }
                         )
                     }
                 }

@@ -63,6 +63,7 @@ import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
@@ -107,6 +108,7 @@ fun SettingsScreen(
     var pinError by remember { mutableStateOf<String?>(null) }
 
     var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
+    val masterKeyGate = rememberMasterKeyGate(preferences)
 
     SheildlenzBackdrop(modifier = Modifier.testTag("settings_screen_root")) {
         Scaffold(
@@ -134,7 +136,10 @@ fun SettingsScreen(
                     ModelManagerCard(
                         telemetry = telemetry,
                         modelManager = modelManager,
-                        onModelUpdated = onModelUpdated
+                        onModelUpdated = onModelUpdated,
+                        onRequireAuth = { label, action ->
+                            masterKeyGate.request(label) { action() }
+                        }
                     )
                 }
 
@@ -178,9 +183,17 @@ fun SettingsScreen(
 
                             Button(
                                 onClick = {
-                                    pinInput = ""
-                                    pinError = null
-                                    showPinDialog = true
+                                    if (hasPin) {
+                                        masterKeyGate.request("change Master Key") {
+                                            pinInput = ""
+                                            pinError = null
+                                            showPinDialog = true
+                                        }
+                                    } else {
+                                        pinInput = ""
+                                        pinError = null
+                                        showPinDialog = true
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (hasPin) AegisSurfaceElevated else AegisPrimaryCyan,
@@ -234,13 +247,21 @@ fun SettingsScreen(
                                             if (isSelected) AegisPrimaryCyan.copy(alpha = 0.45f) else AegisCardBorder,
                                             RoundedCornerShape(14.dp)
                                         )
-                                        .clickable { preferences.setSensitivity(level) }
+                                        .clickable {
+                                            masterKeyGate.request("change sensitivity to ${level.displayName}") {
+                                                preferences.setSensitivity(level)
+                                            }
+                                        }
                                         .padding(horizontal = 10.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     RadioButton(
                                         selected = isSelected,
-                                        onClick = { preferences.setSensitivity(level) },
+                                        onClick = {
+                                            masterKeyGate.request("change sensitivity to ${level.displayName}") {
+                                                preferences.setSensitivity(level)
+                                            }
+                                        },
                                         colors = RadioButtonDefaults.colors(
                                             selectedColor = AegisPrimaryCyan,
                                             unselectedColor = AegisTextMuted
@@ -290,12 +311,16 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = isStrictEverything,
-                                onCheckedChange = { preferences.setStrictEverything(it) },
+                                onCheckedChange = { enabled ->
+                                    masterKeyGate.request("${if (enabled) "enable" else "disable"} Strict Everything") {
+                                        preferences.setStrictEverything(enabled)
+                                    }
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = AegisOnPrimaryWhite,
                                     checkedTrackColor = AegisPrimaryCyan,
                                     uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                    uncheckedTrackColor = AegisCardBorder
                                 )
                             )
                         }
@@ -322,7 +347,11 @@ fun SettingsScreen(
                             listOf(1, 4, 10, 24).forEach { hrs ->
                                 val selected = (lockdownDurationMinutes == hrs * 60)
                                 OutlinedButton(
-                                    onClick = { preferences.setLockdownHours(hrs) },
+                                    onClick = {
+                                        masterKeyGate.request("set lockdown to ${hrs}H") {
+                                            preferences.setLockdownHours(hrs)
+                                        }
+                                    },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         containerColor = if (selected) AegisPrimaryCyan else AegisSurfaceElevated,
@@ -361,12 +390,16 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = waitCooldownBeforePin,
-                                onCheckedChange = { preferences.setWaitCooldownBeforePassword(it) },
+                                onCheckedChange = { enabled ->
+                                    masterKeyGate.request("change cooldown policy") {
+                                        preferences.setWaitCooldownBeforePassword(enabled)
+                                    }
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = AegisOnPrimaryWhite,
                                     checkedTrackColor = AegisPrimaryCyan,
                                     uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                    uncheckedTrackColor = AegisCardBorder
                                 )
                             )
                         }
@@ -395,12 +428,16 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = antiTamperEnabled,
-                                onCheckedChange = { preferences.setAntiTamperEnabled(it) },
+                                onCheckedChange = { enabled ->
+                                    masterKeyGate.request("change anti-tamper policy") {
+                                        preferences.setAntiTamperEnabled(enabled)
+                                    }
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = AegisOnPrimaryWhite,
                                     checkedTrackColor = AegisPrimaryCyan,
                                     uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                    uncheckedTrackColor = AegisCardBorder
                                 )
                             )
                         }
@@ -429,12 +466,16 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = isAutoStart,
-                                onCheckedChange = { preferences.setAutoStart(it) },
+                                onCheckedChange = { enabled ->
+                                    masterKeyGate.request("change boot auto-start") {
+                                        preferences.setAutoStart(enabled)
+                                    }
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = AegisOnPrimaryWhite,
                                     checkedTrackColor = AegisPrimaryCyan,
                                     uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                    uncheckedTrackColor = AegisCardBorder
                                 )
                             )
                         }
@@ -463,12 +504,16 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = isMaintenanceMode,
-                                onCheckedChange = { preferences.setMaintenanceMode(it) },
+                                onCheckedChange = { isChecked ->
+                                    masterKeyGate.request("${if (isChecked) "enable" else "disable"} Maintenance Mode") {
+                                        preferences.setMaintenanceMode(isChecked)
+                                    }
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = AegisOnPrimaryWhite,
                                     checkedTrackColor = AegisDangerRed,
                                     uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                    uncheckedTrackColor = AegisCardBorder
                                 )
                             )
                         }
@@ -477,9 +522,11 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = {
-                                    preferences.grantTemporarySettingsAuthorization()
-                                    context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
-                                    isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
+                                    masterKeyGate.request("activate Device Admin") {
+                                        preferences.grantTemporarySettingsAuthorization()
+                                        context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                                        isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = AegisPrimaryCyan,

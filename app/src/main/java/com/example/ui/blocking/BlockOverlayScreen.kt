@@ -66,6 +66,7 @@ import com.example.ui.components.CyberCard
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
@@ -114,7 +115,7 @@ fun BlockOverlayScreen(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         AegisVoidBackground,
-                        Color(0xFFFDF0F2),
+                        AegisChampagneSoft,
                         AegisVoidBackground
                     )
                 )

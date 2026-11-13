@@ -60,6 +60,7 @@ import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.MetricTile
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
+import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisPrimaryCyan
@@ -81,6 +82,7 @@ fun LiveProtectionScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val telemetry by protectionRepo.telemetry.collectAsState()
     val activeAppName by protectionRepo.activeAppLabel.collectAsState()
+    val masterKeyGate = rememberMasterKeyGate(preferences)
 
     var hasOverlay by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     var hasAccessibility by remember {
@@ -231,11 +233,13 @@ fun LiveProtectionScreen(
                             label = "System Overlay Permission",
                             isHealthy = hasOverlay,
                             onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                try {
-                                    context.startActivity(PermissionHelper.getOverlaySettingsIntent(context))
-                                } catch (_: Exception) {
-                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                masterKeyGate.request("open Overlay settings") {
+                                    preferences.grantTemporarySettingsAuthorization()
+                                    try {
+                                        context.startActivity(PermissionHelper.getOverlaySettingsIntent(context))
+                                    } catch (_: Exception) {
+                                        context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                    }
                                 }
                             }
                         )
@@ -244,11 +248,13 @@ fun LiveProtectionScreen(
                             label = "Accessibility Window Sensor",
                             isHealthy = hasAccessibility,
                             onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                try {
-                                    context.startActivity(PermissionHelper.getAccessibilitySettingsIntent())
-                                } catch (_: Exception) {
-                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                masterKeyGate.request("open Accessibility settings") {
+                                    preferences.grantTemporarySettingsAuthorization()
+                                    try {
+                                        context.startActivity(PermissionHelper.getAccessibilitySettingsIntent())
+                                    } catch (_: Exception) {
+                                        context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                    }
                                 }
                             }
                         )
@@ -257,11 +263,13 @@ fun LiveProtectionScreen(
                             label = "Device Administrator Protection",
                             isHealthy = isDeviceAdmin,
                             onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                try {
-                                    context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
-                                } catch (_: Exception) {
-                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                masterKeyGate.request("activate Device Admin") {
+                                    preferences.grantTemporarySettingsAuthorization()
+                                    try {
+                                        context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                                    } catch (_: Exception) {
+                                        context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                    }
                                 }
                             }
                         )
@@ -270,11 +278,13 @@ fun LiveProtectionScreen(
                             label = "Battery Optimization Exemption",
                             isHealthy = hasBattery,
                             onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                try {
-                                    context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context))
-                                } catch (_: Exception) {
-                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                masterKeyGate.request("open Battery settings") {
+                                    preferences.grantTemporarySettingsAuthorization()
+                                    try {
+                                        context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context))
+                                    } catch (_: Exception) {
+                                        context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                    }
                                 }
                             }
                         )

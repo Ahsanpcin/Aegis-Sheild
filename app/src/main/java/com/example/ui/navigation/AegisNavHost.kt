@@ -338,7 +338,8 @@ fun AegisNavHost(
                             )
                         } else {
                             SecurityHistoryScreen(
-                                historyRepo = container.securityHistoryRepository
+                                historyRepo = container.securityHistoryRepository,
+                                preferences = container.preferences
                             )
                         }
                     }

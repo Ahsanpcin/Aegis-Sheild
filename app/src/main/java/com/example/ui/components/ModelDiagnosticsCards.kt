@@ -80,7 +80,8 @@ fun ModelManagerCard(
     telemetry: EngineTelemetry,
     modelManager: ModelManager,
     onModelUpdated: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRequireAuth: (actionLabel: String, onAuthorized: () -> Unit) -> Unit = { _, action -> action() }
 ) {
     val scope = rememberCoroutineScope()
     var isImporting by remember { mutableStateOf(false) }
@@ -240,7 +241,12 @@ fun ModelManagerCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Button(
-                onClick = { modelPickerLauncher.launch(arrayOf("*/*")) },
+                onClick = {
+                    val label = if (telemetry.isModelLoaded) "replace AI model" else "load AI model"
+                    onRequireAuth(label) {
+                        modelPickerLauncher.launch(arrayOf("*/*"))
+                    }
+                },
                 enabled = !isImporting,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AegisPrimaryCyan,
@@ -282,9 +288,11 @@ fun ModelManagerCard(
             if (telemetry.isModelLoaded && modelManager.activeModelFile.exists()) {
                 OutlinedButton(
                     onClick = {
-                        modelManager.clearImportedModel()
-                        localError = null
-                        onModelUpdated()
+                        onRequireAuth("remove AI model") {
+                            modelManager.clearImportedModel()
+                            localError = null
+                            onModelUpdated()
+                        }
                     },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisDangerRed),

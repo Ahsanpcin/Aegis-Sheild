@@ -37,9 +37,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisCyanGlow
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisMintSoft
 import com.example.ui.theme.AegisOpticalTeal
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisRedGlow
@@ -260,7 +262,7 @@ fun AegisShieldGraphic(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         Color.White,
-                        AegisSecondaryBackground
+                        if (isThreatActive) AegisChampagneSoft else AegisSecondaryBackground
                     )
                 )
             )
@@ -317,10 +319,20 @@ fun AegisShieldGraphic(
 
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        if (isThreatActive) Color(0xFF4A0A14) else Color(0xFF0E234E),
-                        if (isThreatActive) AegisDangerRed.copy(alpha = 0.8f) else primaryColor
-                    ),
+                    colors = when {
+                        isThreatActive -> listOf(
+                            AegisChampagneSoft,
+                            AegisChampagneGold.copy(alpha = 0.88f)
+                        )
+                        isProtected -> listOf(
+                            AegisMintSoft,
+                            AegisElectricBlue.copy(alpha = 0.88f)
+                        )
+                        else -> listOf(
+                            AegisSecondaryBackground,
+                            AegisTextMuted.copy(alpha = 0.55f)
+                        )
+                    },
                     center = lensCenter,
                     radius = outerLensRadius
                 ),

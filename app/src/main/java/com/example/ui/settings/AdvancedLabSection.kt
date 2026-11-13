@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,6 +60,7 @@ import com.example.BuildConfig
 import com.example.data.preferences.AegisPreferences
 import com.example.ui.components.CyberCard
 import com.example.ui.components.LuxurySectionHeader
+import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisDangerRed
@@ -197,6 +199,8 @@ fun AdvancedPrecisionLabSection(
     val evictAppOnThreat by preferences.evictAppOnThreat.collectAsState()
     val guardianWindowMinutes by preferences.guardianSettingsWindowMinutes.collectAsState()
 
+    val masterKeyGate = rememberMasterKeyGate(preferences)
+
     AnimatedVisibility(
         visible = isUnlocked,
         enter = fadeIn() + expandVertically(),
@@ -212,8 +216,6 @@ fun AdvancedPrecisionLabSection(
 
             // 1. Exact Lockdown Duration Specificity (Hours + Minutes + Multiplier)
             CyberCard(borderColor = AegisChampagneGold.copy(alpha = 0.50f)) {
-                val selectedHours = lockdownDurationMinutes / 60
-                val selectedMins = lockdownDurationMinutes % 60
                 val stage1Formatted = AegisPreferences.formatMinutesLabel(lockdownDurationMinutes)
                 val doubleFormatted = AegisPreferences.formatMinutesLabel(
                     (lockdownDurationMinutes * doubleTimeMultiplier).toInt().coerceAtLeast(1)
@@ -293,6 +295,9 @@ fun AdvancedPrecisionLabSection(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
+                var draftHours by remember(lockdownDurationMinutes) { mutableIntStateOf(lockdownDurationMinutes / 60) }
+                var draftMins by remember(lockdownDurationMinutes) { mutableIntStateOf(lockdownDurationMinutes % 60) }
+
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -312,7 +317,13 @@ fun AdvancedPrecisionLabSection(
                         LabChip(
                             label = label,
                             selected = active,
-                            onClick = { preferences.setLockdownDurationMinutes(mins) },
+                            onClick = {
+                                if (!active) {
+                                    masterKeyGate.request("set lockdown duration to $label") {
+                                        preferences.setLockdownDurationMinutes(mins)
+                                    }
+                                }
+                            },
                             modifier = Modifier.testTag("lab_duration_preset_$label")
                         )
                     }
@@ -321,18 +332,32 @@ fun AdvancedPrecisionLabSection(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Fine Hours: ${selectedHours}h",
+                    text = "Fine Hours: ${draftHours}h",
                     color = AegisTextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = ClassicalBodyFont
                 )
                 Slider(
-                    value = selectedHours.toFloat(),
+                    value = draftHours.toFloat(),
                     onValueChange = { newHrs ->
                         val h = newHrs.roundToInt().coerceIn(0, 24)
-                        val m = if (h == 24) 0 else selectedMins
-                        preferences.setLockdownDurationMinutes((h * 60 + m).coerceAtLeast(1))
+                        draftHours = h
+                        if (h == 24) draftMins = 0
+                    },
+                    onValueChangeFinished = {
+                        val target = (draftHours * 60 + draftMins).coerceAtLeast(1)
+                        if (target != lockdownDurationMinutes) {
+                            masterKeyGate.request(
+                                actionLabel = "set lockdown timer to ${AegisPreferences.formatMinutesLabel(target)}",
+                                onCancel = {
+                                    draftHours = lockdownDurationMinutes / 60
+                                    draftMins = lockdownDurationMinutes % 60
+                                }
+                            ) {
+                                preferences.setLockdownDurationMinutes(target)
+                            }
+                        }
                     },
                     valueRange = 0f..24f,
                     steps = 23,
@@ -343,18 +368,32 @@ fun AdvancedPrecisionLabSection(
                 )
 
                 Text(
-                    text = "Fine Minutes: ${selectedMins}m",
+                    text = "Fine Minutes: ${draftMins}m",
                     color = AegisTextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = ClassicalBodyFont
                 )
                 Slider(
-                    value = selectedMins.toFloat(),
+                    value = draftMins.toFloat(),
                     onValueChange = { newMins ->
                         val m = newMins.roundToInt().coerceIn(0, 59)
-                        val h = if (selectedHours >= 24) 23 else selectedHours
-                        preferences.setLockdownDurationMinutes((h * 60 + m).coerceAtLeast(1))
+                        draftMins = m
+                        if (draftHours >= 24) draftHours = 23
+                    },
+                    onValueChangeFinished = {
+                        val target = (draftHours * 60 + draftMins).coerceAtLeast(1)
+                        if (target != lockdownDurationMinutes) {
+                            masterKeyGate.request(
+                                actionLabel = "set lockdown timer to ${AegisPreferences.formatMinutesLabel(target)}",
+                                onCancel = {
+                                    draftHours = lockdownDurationMinutes / 60
+                                    draftMins = lockdownDurationMinutes % 60
+                                }
+                            ) {
+                                preferences.setLockdownDurationMinutes(target)
+                            }
+                        }
                     },
                     valueRange = 0f..59f,
                     colors = SliderDefaults.colors(
@@ -382,7 +421,13 @@ fun AdvancedPrecisionLabSection(
                         LabChip(
                             label = formatMultiplier(mult),
                             selected = selected,
-                            onClick = { preferences.setDoubleTimeMultiplier(mult) },
+                            onClick = {
+                                if (!selected) {
+                                    masterKeyGate.request("set double-time multiplier to ${formatMultiplier(mult)}") {
+                                        preferences.setDoubleTimeMultiplier(mult)
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -414,21 +459,39 @@ fun AdvancedPrecisionLabSection(
                     title = "Custom Confidence Override",
                     subtitle = "Set exact Explicit & Suggestive % cutoffs",
                     checked = customThresholdsEnabled,
-                    onCheckedChange = { preferences.setCustomThresholdsEnabled(it) }
+                    onCheckedChange = { enabled ->
+                        masterKeyGate.request("${if (enabled) "enable" else "disable"} custom confidence override") {
+                            preferences.setCustomThresholdsEnabled(enabled)
+                        }
+                    }
                 )
 
                 if (customThresholdsEnabled) {
+                    var draftExplicit by remember(customExplicitThreshold) { mutableFloatStateOf(customExplicitThreshold) }
+                    var draftSuggestive by remember(customSuggestiveThreshold) { mutableFloatStateOf(customSuggestiveThreshold) }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Explicit Block Threshold: ${(customExplicitThreshold * 100).roundToInt()}%",
+                        text = "Explicit Block Threshold: ${(draftExplicit * 100).roundToInt()}%",
                         color = AegisDangerRed,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = ClassicalBodyFont
                     )
                     Slider(
-                        value = customExplicitThreshold,
-                        onValueChange = { preferences.setCustomExplicitThreshold(it) },
+                        value = draftExplicit,
+                        onValueChange = { draftExplicit = it },
+                        onValueChangeFinished = {
+                            val target = draftExplicit
+                            if (kotlin.math.abs(target - customExplicitThreshold) > 0.001f) {
+                                masterKeyGate.request(
+                                    actionLabel = "set Explicit threshold to ${(target * 100).roundToInt()}%",
+                                    onCancel = { draftExplicit = customExplicitThreshold }
+                                ) {
+                                    preferences.setCustomExplicitThreshold(target)
+                                }
+                            }
+                        },
                         valueRange = 0.35f..0.95f,
                         colors = SliderDefaults.colors(
                             thumbColor = AegisDangerRed,
@@ -437,15 +500,26 @@ fun AdvancedPrecisionLabSection(
                     )
 
                     Text(
-                        text = "Suggestive Block Threshold: ${(customSuggestiveThreshold * 100).roundToInt()}%",
+                        text = "Suggestive Block Threshold: ${(draftSuggestive * 100).roundToInt()}%",
                         color = AegisWarningAmber,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = ClassicalBodyFont
                     )
                     Slider(
-                        value = customSuggestiveThreshold,
-                        onValueChange = { preferences.setCustomSuggestiveThreshold(it) },
+                        value = draftSuggestive,
+                        onValueChange = { draftSuggestive = it },
+                        onValueChangeFinished = {
+                            val target = draftSuggestive
+                            if (kotlin.math.abs(target - customSuggestiveThreshold) > 0.001f) {
+                                masterKeyGate.request(
+                                    actionLabel = "set Suggestive threshold to ${(target * 100).roundToInt()}%",
+                                    onCancel = { draftSuggestive = customSuggestiveThreshold }
+                                ) {
+                                    preferences.setCustomSuggestiveThreshold(target)
+                                }
+                            }
+                        },
                         valueRange = 0.35f..0.95f,
                         colors = SliderDefaults.colors(
                             thumbColor = AegisWarningAmber,
@@ -469,10 +543,17 @@ fun AdvancedPrecisionLabSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     (1..5).forEach { count ->
+                        val selected = consecutiveFramesRequired == count
                         LabChip(
                             label = "${count}F",
-                            selected = consecutiveFramesRequired == count,
-                            onClick = { preferences.setConsecutiveFramesRequired(count) },
+                            selected = selected,
+                            onClick = {
+                                if (!selected) {
+                                    masterKeyGate.request("set consecutive frames to $count") {
+                                        preferences.setConsecutiveFramesRequired(count)
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -484,7 +565,11 @@ fun AdvancedPrecisionLabSection(
                     title = "Skip Duplicate Static Frames",
                     subtitle = "Save battery on unchanged screens",
                     checked = skipDuplicateFrames,
-                    onCheckedChange = { preferences.setSkipDuplicateFrames(it) }
+                    onCheckedChange = { enabled ->
+                        masterKeyGate.request("${if (enabled) "enable" else "disable"} duplicate frame skipping") {
+                            preferences.setSkipDuplicateFrames(enabled)
+                        }
+                    }
                 )
             }
 
@@ -509,19 +594,30 @@ fun AdvancedPrecisionLabSection(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val fpsEstimate = 1000f / scanIntervalMs.coerceAtLeast(100)
+                var draftScanInterval by remember(scanIntervalMs) { mutableIntStateOf(scanIntervalMs) }
+                val fpsEstimate = 1000f / draftScanInterval.coerceAtLeast(100)
                 Text(
-                    text = String.format(Locale.US, "Frame Inspection Interval: %d ms (%.1f FPS)", scanIntervalMs, fpsEstimate),
+                    text = String.format(Locale.US, "Frame Inspection Interval: %d ms (%.1f FPS)", draftScanInterval, fpsEstimate),
                     color = AegisPrimaryCyan,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = ClassicalBodyFont
                 )
                 Slider(
-                    value = scanIntervalMs.toFloat(),
+                    value = draftScanInterval.toFloat(),
                     onValueChange = { ms ->
-                        val snapped = ((ms / 50f).roundToInt() * 50).coerceIn(100, 2000)
-                        preferences.setScanIntervalMs(snapped)
+                        draftScanInterval = ((ms / 50f).roundToInt() * 50).coerceIn(100, 2000)
+                    },
+                    onValueChangeFinished = {
+                        val snapped = draftScanInterval
+                        if (snapped != scanIntervalMs) {
+                            masterKeyGate.request(
+                                actionLabel = "set scan interval to ${snapped}ms",
+                                onCancel = { draftScanInterval = scanIntervalMs }
+                            ) {
+                                preferences.setScanIntervalMs(snapped)
+                            }
+                        }
                     },
                     valueRange = 100f..2000f,
                     colors = SliderDefaults.colors(
@@ -543,10 +639,17 @@ fun AdvancedPrecisionLabSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(320, 480, 640, 720).forEach { w ->
+                        val selected = captureWidthPx == w
                         LabChip(
                             label = "${w}px",
-                            selected = captureWidthPx == w,
-                            onClick = { preferences.setCaptureWidthPx(w) },
+                            selected = selected,
+                            onClick = {
+                                if (!selected) {
+                                    masterKeyGate.request("set capture width to ${w}px") {
+                                        preferences.setCaptureWidthPx(w)
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -587,10 +690,17 @@ fun AdvancedPrecisionLabSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(1, 2, 5, 10).forEach { mins ->
+                        val selected = guardianWindowMinutes == mins
                         LabChip(
                             label = "${mins}m",
-                            selected = guardianWindowMinutes == mins,
-                            onClick = { preferences.setGuardianSettingsWindowMinutes(mins) },
+                            selected = selected,
+                            onClick = {
+                                if (!selected) {
+                                    masterKeyGate.request("set authorization window to ${mins}m") {
+                                        preferences.setGuardianSettingsWindowMinutes(mins)
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -602,7 +712,11 @@ fun AdvancedPrecisionLabSection(
                     title = "Evict & Kill Offending App",
                     subtitle = "Send Home & close offending app",
                     checked = evictAppOnThreat,
-                    onCheckedChange = { preferences.setEvictAppOnThreat(it) }
+                    onCheckedChange = { enabled ->
+                        masterKeyGate.request("${if (enabled) "enable" else "disable"} app eviction") {
+                            preferences.setEvictAppOnThreat(enabled)
+                        }
+                    }
                 )
 
                 HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 10.dp))
@@ -611,7 +725,11 @@ fun AdvancedPrecisionLabSection(
                     title = "Emergency Dialer on Lockscreen",
                     subtitle = "Show Emergency button during lockdown",
                     checked = showEmergencyDialer,
-                    onCheckedChange = { preferences.setShowEmergencyDialerOnLockdown(it) }
+                    onCheckedChange = { enabled ->
+                        masterKeyGate.request("${if (enabled) "show" else "hide"} Emergency dialer") {
+                            preferences.setShowEmergencyDialerOnLockdown(enabled)
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -622,8 +740,10 @@ fun AdvancedPrecisionLabSection(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            preferences.resetAdvancedCustomizations()
-                            Toast.makeText(context, "Advanced customizations reset to defaults.", Toast.LENGTH_SHORT).show()
+                            masterKeyGate.request("reset advanced settings") {
+                                preferences.resetAdvancedCustomizations()
+                                Toast.makeText(context, "Advanced customizations reset to defaults.", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisWarningAmber),
                         shape = RoundedCornerShape(12.dp),
@@ -638,8 +758,10 @@ fun AdvancedPrecisionLabSection(
 
                     OutlinedButton(
                         onClick = {
-                            preferences.setAdvancedOptionsUnlocked(false)
-                            Toast.makeText(context, "Advanced Precision Lab hidden.", Toast.LENGTH_SHORT).show()
+                            masterKeyGate.request("hide Precision Lab") {
+                                preferences.setAdvancedOptionsUnlocked(false)
+                                Toast.makeText(context, "Advanced Precision Lab hidden.", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisTextSecondary),
                         shape = RoundedCornerShape(12.dp),
@@ -722,7 +844,7 @@ private fun LabSwitchRow(
                 checkedThumbColor = AegisOnPrimaryWhite,
                 checkedTrackColor = AegisPrimaryCyan,
                 uncheckedThumbColor = AegisTextMuted,
-                uncheckedTrackColor = Color(0xFFCBD5E1)
+                uncheckedTrackColor = AegisCardBorder
             )
         )
     }

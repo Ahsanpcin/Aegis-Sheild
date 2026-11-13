@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
+    <color name="sheildlenz_sky_blue">#FF2563EB</color>
+    <color name="sheildlenz_aqua_mint">#FF0D9488</color>
+    <color name="sheildlenz_champagne_gold">#FFD4942A</color>
+    <color name="sheildlenz_canvas_light">#FFF7FAFF</color>
+    <color name="sheildlenz_ink_blue">#FF1E408A</color>
     <color name="white">#FFFFFFFF</color>
 </resources>
