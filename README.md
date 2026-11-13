@@ -40,7 +40,7 @@ Scan verified safe via VirusTotal
 
 | Home Screen | AI Detection Alert | Strict Lock Screen |
 | :---: | :---: | :---: |
-| ![Home](https://github.com/user-attachments/assets/bdbcd805-cfc2-46a5-99ff-d7dc81214938.png) | ![Alert](https://github.com/user-attachments/assets/3025e5b7-cd4b-4f53-b107-229a2b873dfe.png) | ![Lock](https://github.com/user-attachments/assets/0ab8f0f9-feab-4ae1-a1c2-900bb395e674.png) |
+| ![Home](https://github.com/user-attachments/assets/bdbcd805-cfc2-46a5-99ff-d7dc81214938) | ![Alert](https://github.com/user-attachments/assets/3025e5b7-cd4b-4f53-b107-229a2b873dfe) | ![Lock](https://github.com/user-attachments/assets/0ab8f0f9-feab-4ae1-a1c2-900bb395e674) |
 
 ---
 
