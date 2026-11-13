@@ -73,6 +73,7 @@ import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.MetricTile
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.components.StatusPill
 import com.example.ui.components.ThreatCategoryBadge
 import com.example.ui.theme.AegisCardBackground
@@ -167,6 +168,7 @@ fun DashboardScreen(
                     }
                 )
             },
+            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(

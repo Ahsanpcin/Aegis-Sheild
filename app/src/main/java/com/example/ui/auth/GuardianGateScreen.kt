@@ -1,6 +1,7 @@
 package com.example.ui.auth
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,8 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
@@ -37,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.ui.components.AegisShieldGraphic
+import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.CyberCard
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
@@ -71,10 +75,17 @@ fun GuardianGateScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             AegisShieldGraphic(
                 isProtected = telemetry.isProtectionEnabled,
                 isThreatActive = false,
@@ -180,6 +191,11 @@ fun GuardianGateScreen(
                         letterSpacing = 0.8.sp
                     )
                 }
+            }
+            }
+
+            Box(modifier = Modifier.padding(top = 20.dp, bottom = 6.dp)) {
+                AhsanTcrBrandingPill()
             }
         }
     }

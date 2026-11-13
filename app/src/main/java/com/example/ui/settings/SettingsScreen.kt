@@ -65,6 +65,7 @@ import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
@@ -124,6 +125,7 @@ fun SettingsScreen(
                     onNavigateBack = onNavigateBack
                 )
             },
+            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(

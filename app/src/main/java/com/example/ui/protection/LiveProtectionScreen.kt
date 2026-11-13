@@ -54,6 +54,7 @@ import com.example.ui.components.MetricTile
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SampleImageTesterCard
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.components.StatusPill
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
@@ -94,6 +95,7 @@ fun LiveProtectionScreen(
                     onNavigateBack = onNavigateBack
                 )
             },
+            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(

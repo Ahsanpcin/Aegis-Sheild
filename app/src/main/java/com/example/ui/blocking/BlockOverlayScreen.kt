@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
@@ -60,6 +62,7 @@ import com.example.core.models.ThreatCategory
 import com.example.data.preferences.AegisPreferences
 import com.example.services.protection.AegisLockdownService
 import com.example.ui.components.AegisShieldGraphic
+import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.CyberCard
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
@@ -124,7 +127,8 @@ fun BlockOverlayScreen(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -277,6 +281,10 @@ fun BlockOverlayScreen(
                     letterSpacing = 0.6.sp
                 )
             }
+
+            Spacer(modifier = Modifier.height(22.dp))
+
+            AhsanTcrBrandingPill()
         }
 
         if (showPinDialog) {

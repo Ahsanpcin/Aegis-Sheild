@@ -1,8 +1,12 @@
 package com.example
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
+import com.example.ui.components.AHSAN_TCR_CONTACT_DOMAIN
+import com.example.ui.components.AHSAN_TCR_CONTACT_URL
+import com.example.ui.components.openAhsanTcrContact
 import com.example.core.models.SecurityIncident
 import com.example.core.models.SensitivityLevel
 import com.example.core.models.ThreatCategory
@@ -26,6 +30,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSettings
 
@@ -488,5 +493,20 @@ class ExampleRobolectricTest {
         assertFalse(f1.shouldBlock)
         assertFalse(f2.shouldBlock)
         assertTrue(f3.shouldBlock)
+    }
+
+    @Test
+    fun `ahsantcr branding opens external contact url cleanly`() {
+        assertEquals("https://ahsantcr.lovable.app", AHSAN_TCR_CONTACT_URL)
+        assertEquals("ahsantcr.lovable.app", AHSAN_TCR_CONTACT_DOMAIN)
+
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        openAhsanTcrContact(app)
+
+        val startedIntent = Shadows.shadowOf(app).nextStartedActivity
+        assertNotNull(startedIntent)
+        assertEquals(Intent.ACTION_VIEW, startedIntent.action)
+        assertEquals("https://ahsantcr.lovable.app", startedIntent.dataString)
+        assertTrue((startedIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
     }
 }

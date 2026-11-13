@@ -54,6 +54,7 @@ import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.SeverityTag
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.components.ThreatCategoryBadge
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
@@ -106,6 +107,7 @@ fun SecurityHistoryScreen(
                     }
                 )
             },
+            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             if (incidents.isEmpty()) {

@@ -54,6 +54,7 @@ import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisDangerRed
@@ -99,6 +100,7 @@ fun OnboardingScreen(
                     subtitle = "Security & Permission Architecture"
                 )
             },
+            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(

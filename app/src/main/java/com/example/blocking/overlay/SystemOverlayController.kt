@@ -467,6 +467,9 @@ class SystemOverlayController(private val context: Context) {
         }
         root.addView(emergencyBtn)
 
+        root.addView(verticalSpacer(22))
+        root.addView(createOverlayBrandingView(allowOpenLink = false))
+
         scroll.addView(root)
         return scroll
     }
@@ -585,7 +588,28 @@ class SystemOverlayController(private val context: Context) {
         }
         root.addView(homeBtn)
 
+        root.addView(verticalSpacer(24))
+        root.addView(createOverlayBrandingView(allowOpenLink = true))
+
         return root
+    }
+
+    private fun createOverlayBrandingView(allowOpenLink: Boolean): View {
+        return TextView(context).apply {
+            text = "Built By AhsanTCr  •  ahsantcr.lovable.app"
+            setTextColor(Color.parseColor("#1A3A7A"))
+            textSize = 11f
+            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            background = roundedBox("#FFFFFF", "#E5C170", 50f)
+            setPadding(34, 16, 34, 16)
+            if (allowOpenLink) {
+                setOnClickListener {
+                    dismissBlockOverlay()
+                    com.example.ui.components.openAhsanTcrContact(context)
+                }
+            }
+        }
     }
 
     private fun updateLockdownTimerUi() {
