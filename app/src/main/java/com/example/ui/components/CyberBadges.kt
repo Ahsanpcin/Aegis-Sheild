@@ -1,11 +1,21 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -23,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,7 +65,20 @@ fun StatusPill(
         label = "DotPulse"
     )
 
-    val color = if (isActive) activeColor else inactiveColor
+    val color by animateColorAsState(
+        targetValue = if (isActive) activeColor else inactiveColor,
+        animationSpec = tween(durationMillis = 360),
+        label = "StatusPillColor"
+    )
+
+    val dotScale by animateFloatAsState(
+        targetValue = if (isActive) 1.15f else 0.9f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "StatusDotScale"
+    )
 
     Row(
         modifier = modifier
@@ -67,8 +91,12 @@ fun StatusPill(
         Box(
             modifier = Modifier
                 .size(12.dp)
+                .graphicsLayer {
+                    scaleX = dotScale
+                    scaleY = dotScale
+                }
                 .clip(CircleShape)
-                .background(color.copy(alpha = if (isActive) 0.22f * dotAlpha else 0.14f)),
+                .background(color.copy(alpha = if (isActive) 0.24f * dotAlpha else 0.14f)),
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -79,14 +107,23 @@ fun StatusPill(
             )
         }
         Spacer(modifier = Modifier.width(7.dp))
-        Text(
-            text = label.uppercase(),
-            color = color,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.9.sp,
-            fontFamily = ClassicalBodyFont
-        )
+        AnimatedContent(
+            targetState = label.uppercase(),
+            transitionSpec = {
+                (fadeIn(tween(220)) + slideInVertically(tween(220)) { if (isActive) it / 2 else -it / 2 })
+                    .togetherWith(fadeOut(tween(160)) + slideOutVertically(tween(160)) { if (isActive) -it / 2 else it / 2 })
+            },
+            label = "StatusPillText"
+        ) { targetText ->
+            Text(
+                text = targetText,
+                color = color,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.9.sp,
+                fontFamily = ClassicalBodyFont
+            )
+        }
     }
 }
 

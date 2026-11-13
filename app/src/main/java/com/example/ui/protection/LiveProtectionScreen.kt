@@ -1,63 +1,66 @@
 package com.example.ui.protection
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.models.SecurityIncident
-import com.example.core.models.ThreatCategory
-import com.example.core.models.ThreatSeverity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.core.permissions.PermissionHelper
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
-import com.example.data.repository.SecurityHistoryRepository
-import com.example.detection.classifier.ModelManager
+import com.example.monitoring.accessibility.AegisAccessibilityService
+import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.MetricTile
-import com.example.ui.components.ModelManagerCard
-import com.example.ui.components.SampleImageTesterCard
 import com.example.ui.components.SheildlenzBackdrop
-import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.components.StatusPill
 import com.example.ui.theme.AegisCardBorder
-import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
@@ -68,34 +71,50 @@ import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
-import kotlinx.coroutines.launch
 
 @Composable
 fun LiveProtectionScreen(
     protectionRepo: ProtectionRepository,
-    historyRepo: SecurityHistoryRepository,
-    modelManager: ModelManager,
-    preferences: AegisPreferences,
-    onNavigateBack: () -> Unit,
-    onTriggerBlockOverlay: () -> Unit,
-    onModelUpdated: () -> Unit = {}
+    preferences: AegisPreferences
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val telemetry by protectionRepo.telemetry.collectAsState()
     val activeAppName by protectionRepo.activeAppLabel.collectAsState()
-    val sensitivity by preferences.sensitivity.collectAsState()
-    val isStrictEverything by preferences.strictEverything.collectAsState()
-    val scope = rememberCoroutineScope()
+
+    var hasOverlay by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
+    var hasAccessibility by remember {
+        mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context, AegisAccessibilityService::class.java))
+    }
+    var hasBattery by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
+    var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasOverlay = PermissionHelper.hasOverlayPermission(context)
+                hasAccessibility = PermissionHelper.isAccessibilityServiceEnabled(
+                    context,
+                    AegisAccessibilityService::class.java
+                )
+                hasBattery = PermissionHelper.isIgnoringBatteryOptimizations(context)
+                isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
+                protectionRepo.refreshPermissionHealth()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     SheildlenzBackdrop(modifier = Modifier.testTag("live_protection_screen_root")) {
         Scaffold(
+            contentWindowInsets = WindowInsets.statusBars,
             topBar = {
                 CyberTopBar(
-                    title = "Live Telemetry",
-                    subtitle = "Real-Time Optical HUD",
-                    onNavigateBack = onNavigateBack
+                    title = "Status",
+                    subtitle = "AI Classifications, Telemetry & Health"
                 )
             },
-            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(
@@ -103,45 +122,36 @@ fun LiveProtectionScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item { Spacer(modifier = Modifier.height(2.dp)) }
-
+                // 1. Top: AI Classifications Widget
                 item {
-                    CyberCard(
-                        borderColor = if (telemetry.isProtectionEnabled) AegisSuccessGreen.copy(alpha = 0.35f) else AegisCardBorder
-                    ) {
+                    LuxurySectionHeader(title = "AI Classifications", accentColor = AegisPurple)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    CyberCard(borderColor = AegisPurple.copy(alpha = 0.28f)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "MONITORING SUBSYSTEM",
-                                    color = AegisTextSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont,
-                                    letterSpacing = 0.9.sp
-                                )
-                                val subtitleState = when {
-                                    telemetry.isProtectionEnabled && telemetry.isModelLoaded -> "Armed & Scanning"
-                                    telemetry.isProtectionEnabled -> "Capture Active (No AI Model)"
-                                    else -> "Standby (Disengaged)"
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(AegisPurple.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(imageVector = Icons.Default.Memory, contentDescription = null, tint = AegisPurple, modifier = Modifier.size(18.dp))
                                 }
-                                val subtitleColor = when {
-                                    telemetry.isProtectionEnabled && telemetry.isModelLoaded -> AegisSuccessGreen
-                                    telemetry.isProtectionEnabled -> AegisWarningAmber
-                                    else -> AegisTextMuted
-                                }
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = subtitleState,
-                                    color = subtitleColor,
-                                    fontSize = 20.sp,
+                                    text = "AI Classification Pipeline",
+                                    color = AegisTextPrimary,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalDisplayFont,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    fontFamily = ClassicalDisplayFont
                                 )
                             }
 
@@ -150,85 +160,6 @@ fun LiveProtectionScreen(
                                 isActive = telemetry.isProtectionEnabled,
                                 activeColor = AegisSuccessGreen,
                                 inactiveColor = AegisTextMuted
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Text(
-                            text = telemetry.statusMessage,
-                            color = AegisTextSecondary,
-                            fontSize = 12.sp,
-                            fontFamily = ClassicalBodyFont
-                        )
-                    }
-                }
-
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        MetricTile(
-                            title = "Inspection Rate",
-                            value = if (telemetry.isProtectionEnabled) "%.1f FPS".format(telemetry.currentInspectionFps) else "0.0 FPS",
-                            icon = Icons.Default.Speed,
-                            accentColor = AegisPrimaryCyan,
-                            caption = "Subsampled rate",
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        MetricTile(
-                            title = "Frames Scanned",
-                            value = telemetry.framesProcessedCount.toString(),
-                            icon = Icons.Default.Camera,
-                            accentColor = AegisElectricBlue,
-                            caption = "Volatile RAM cycle",
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                item {
-                    LuxurySectionHeader(title = "TFLite Model & Verification")
-                }
-
-                item {
-                    ModelManagerCard(
-                        telemetry = telemetry,
-                        modelManager = modelManager,
-                        onModelUpdated = onModelUpdated
-                    )
-                }
-
-                item {
-                    SampleImageTesterCard(
-                        telemetry = telemetry,
-                        modelManager = modelManager,
-                        sensitivity = sensitivity,
-                        isStrictEverything = isStrictEverything
-                    )
-                }
-
-                item {
-                    CyberCard(borderColor = AegisPurple.copy(alpha = 0.28f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(AegisPurple.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(imageVector = Icons.Default.Memory, contentDescription = null, tint = AegisPurple, modifier = Modifier.size(18.dp))
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "AI Classification Pipeline",
-                                color = AegisTextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = ClassicalDisplayFont
                             )
                         }
 
@@ -254,87 +185,100 @@ fun LiveProtectionScreen(
                     }
                 }
 
+                // 2. Live Rates & Frames Widgets
                 item {
-                    CyberCard(borderColor = AegisCardBorder) {
-                        Row(verticalAlignment = Alignment.Top) {
-                            Icon(imageVector = Icons.Default.PrivacyTip, contentDescription = null, tint = AegisPrimaryCyan, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "Strict Zero-Image Retention",
-                                    color = AegisPrimaryCyan,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalDisplayFont
-                                )
-                                Text(
-                                    text = "In compliance with Sheildlenz privacy architecture, screen frames are never converted to persisted JPEG/PNG files. Only numerical confidence scores and security incident metadata are recorded in the local log.",
-                                    color = AegisTextMuted,
-                                    fontSize = 12.sp,
-                                    fontFamily = ClassicalBodyFont,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    lineHeight = 18.sp
-                                )
-                            }
-                        }
+                    LuxurySectionHeader(title = "Live Rates & Frames")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        MetricTile(
+                            title = "Inspection Rate",
+                            value = if (telemetry.isProtectionEnabled) "%.1f FPS".format(telemetry.currentInspectionFps) else "0.0 FPS",
+                            icon = Icons.Default.Speed,
+                            accentColor = AegisPrimaryCyan,
+                            caption = "Live speed",
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        MetricTile(
+                            title = "Frames Scanned",
+                            value = telemetry.framesProcessedCount.toString(),
+                            icon = Icons.Default.Camera,
+                            accentColor = AegisElectricBlue,
+                            caption = "Volatile RAM",
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
 
+                // 3. Last: Permissions Widget (Permission Health Audit)
                 item {
-                    CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.3f)) {
+                    LuxurySectionHeader(title = "Permissions")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    CyberCard(borderColor = AegisCardBorder) {
                         Text(
-                            text = "Security Testing & Simulation",
-                            color = AegisDangerRed,
-                            fontSize = 15.sp,
+                            text = "Permission Health Audit",
+                            color = AegisTextPrimary,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = ClassicalDisplayFont
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Simulate an explicit content detection event to verify the local database audit log and preview the emergency blocking interface.",
-                            color = AegisTextSecondary,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                            fontFamily = ClassicalBodyFont
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    val simulatedIncident = SecurityIncident(
-                                        timestampMillis = System.currentTimeMillis(),
-                                        packageName = "com.android.chrome",
-                                        appDisplayName = "Chrome Browser",
-                                        category = ThreatCategory.EXPLICIT_ADULT,
-                                        severity = ThreatSeverity.CRITICAL,
-                                        confidenceScore = 0.96f,
-                                        actionTaken = "Simulation Preview • System Shield Cast",
-                                        diagnosticSummary = "Simulated Explicit Detection (96% confidence) • Preview mode does not engage 10h device lock."
-                                    )
-                                    historyRepo.logIncident(simulatedIncident)
-                                    protectionRepo.recordDetection(ThreatCategory.EXPLICIT_ADULT)
-                                    onTriggerBlockOverlay()
+                        PermissionHealthRow(
+                            label = "System Overlay Permission",
+                            isHealthy = hasOverlay,
+                            onFix = {
+                                preferences.grantTemporarySettingsAuthorization()
+                                try {
+                                    context.startActivity(PermissionHelper.getOverlaySettingsIntent(context))
+                                } catch (_: Exception) {
+                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AegisDangerRed.copy(alpha = 0.10f),
-                                contentColor = AegisDangerRed
-                            ),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .border(1.dp, AegisDangerRed.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
-                                .testTag("simulate_threat_button")
-                        ) {
-                            Icon(imageVector = Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "SIMULATE THREAT", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont, letterSpacing = 0.6.sp)
-                        }
+                            }
+                        )
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.45f))
+                        PermissionHealthRow(
+                            label = "Accessibility Window Sensor",
+                            isHealthy = hasAccessibility,
+                            onFix = {
+                                preferences.grantTemporarySettingsAuthorization()
+                                try {
+                                    context.startActivity(PermissionHelper.getAccessibilitySettingsIntent())
+                                } catch (_: Exception) {
+                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                }
+                            }
+                        )
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.45f))
+                        PermissionHealthRow(
+                            label = "Device Administrator Protection",
+                            isHealthy = isDeviceAdmin,
+                            onFix = {
+                                preferences.grantTemporarySettingsAuthorization()
+                                try {
+                                    context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                                } catch (_: Exception) {
+                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                }
+                            }
+                        )
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.45f))
+                        PermissionHealthRow(
+                            label = "Battery Optimization Exemption",
+                            isHealthy = hasBattery,
+                            onFix = {
+                                preferences.grantTemporarySettingsAuthorization()
+                                try {
+                                    context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context))
+                                } catch (_: Exception) {
+                                    context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                                }
+                            }
+                        )
                     }
-                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }
@@ -357,5 +301,48 @@ private fun TelemetryDataRow(label: String, value: String) {
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold
         )
+    }
+}
+
+@Composable
+private fun PermissionHealthRow(
+    label: String,
+    isHealthy: Boolean,
+    onFix: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Icon(
+                imageVector = if (isHealthy) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = if (isHealthy) AegisSuccessGreen else AegisWarningAmber,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = label,
+                color = if (isHealthy) AegisTextPrimary else AegisWarningAmber,
+                fontSize = 13.sp,
+                fontFamily = ClassicalBodyFont,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        if (!isHealthy) {
+            OutlinedButton(
+                onClick = onFix,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisPrimaryCyan),
+                modifier = Modifier.height(34.dp)
+            ) {
+                Text(text = "FIX", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
+            }
+        }
     }
 }

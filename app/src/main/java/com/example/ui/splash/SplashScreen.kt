@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.navigation.AegisDestinations
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisPrimaryCyan
@@ -81,9 +82,9 @@ fun SplashScreen(
 
         delay(320)
         if (isOnboardingCompleted) {
-            onNavigateNext("dashboard")
+            onNavigateNext(AegisDestinations.HOME)
         } else {
-            onNavigateNext("onboarding")
+            onNavigateNext(AegisDestinations.ONBOARDING)
         }
     }
 

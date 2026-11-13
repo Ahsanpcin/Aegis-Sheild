@@ -198,10 +198,9 @@ fun ModelManagerCard(
             }
         } else {
             Text(
-                text = "Select a compatible .tflite visual classifier from your phone storage. Supports 2-class, 3-class, and 5-class (MobileNet/Inception NSFW) Float32 or UInt8 models.",
+                text = "Pick a 2/3/5-class .tflite file from phone storage.",
                 color = AegisTextSecondary,
-                fontSize = 13.sp,
-                lineHeight = 19.sp,
+                fontSize = 12.sp,
                 fontFamily = ClassicalBodyFont
             )
         }
@@ -374,7 +373,7 @@ fun SampleImageTesterCard(
                         fontFamily = ClassicalDisplayFont
                     )
                     Text(
-                        text = "Verify live TFLite inference on a photo",
+                        text = "Offline photo check",
                         color = AegisTextMuted,
                         fontSize = 12.sp,
                         fontFamily = ClassicalBodyFont
@@ -383,17 +382,7 @@ fun SampleImageTesterCard(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = "Pick any gallery photo using Android's zero-permission Photo Picker to inspect inference latency, class probabilities, and block decisions offline.",
-            color = AegisTextSecondary,
-            fontSize = 13.sp,
-            lineHeight = 19.sp,
-            fontFamily = ClassicalBodyFont
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
             onClick = {

@@ -54,7 +54,6 @@ import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.SheildlenzBackdrop
-import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisDangerRed
@@ -100,7 +99,6 @@ fun OnboardingScreen(
                     subtitle = "Security & Permission Architecture"
                 )
             },
-            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(
@@ -112,57 +110,17 @@ fun OnboardingScreen(
             ) {
                 item {
                     Spacer(modifier = Modifier.height(2.dp))
-                    CyberCard(borderColor = AegisChampagneGold.copy(alpha = 0.45f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(AegisPrimaryCyan.copy(alpha = 0.12f))
-                                    .border(1.dp, AegisChampagneGold.copy(alpha = 0.45f), RoundedCornerShape(14.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = AegisPrimaryCyan,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "Zero-Cloud Privacy Shield",
-                                    color = AegisPrimaryCyan,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalDisplayFont
-                                )
-                                Text(
-                                    text = "All visual analysis occurs strictly in volatile device RAM. No images, screenshots, or logs are ever transmitted to any remote server or stored to disk.",
-                                    color = AegisTextSecondary,
-                                    fontSize = 12.sp,
-                                    lineHeight = 18.sp,
-                                    fontFamily = ClassicalBodyFont,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    LuxurySectionHeader(title = "System Permissions Checklist")
+                    LuxurySectionHeader(title = "Required Permissions")
                 }
 
                 item {
                     PermissionExplainerCard(
-                        title = "System Overlay Permission",
+                        title = "System Overlay",
                         icon = Icons.Default.Layers,
                         accentColor = AegisPrimaryCyan,
                         isGranted = hasOverlay,
-                        explanation = "Allows Sheildlenz to instantly cast an emergency protective barrier over inappropriate content when detected in web browsers, apps, or local video players.",
-                        actionLabel = if (hasOverlay) "Permission Granted" else "Grant Overlay Permission",
+                        explanation = "Required to display the block shield over other apps.",
+                        actionLabel = if (hasOverlay) "Granted" else "Grant Overlay",
                         onAction = {
                             try {
                                 context.startActivity(PermissionHelper.getOverlaySettingsIntent(context))
@@ -175,25 +133,12 @@ fun OnboardingScreen(
 
                 item {
                     PermissionExplainerCard(
-                        title = "Screen Monitoring (MediaProjection)",
-                        icon = Icons.Default.ScreenShare,
-                        accentColor = AegisElectricBlue,
-                        isGranted = false,
-                        explanation = "Android's official display-capture API allows the on-device AI model to inspect screen frames in real time. Prompted by the OS when master protection is engaged.",
-                        actionLabel = "System Prompt Upon Arming",
-                        onAction = { },
-                        isInformationalOnly = true
-                    )
-                }
-
-                item {
-                    PermissionExplainerCard(
-                        title = "Accessibility Window Sensor",
+                        title = "Accessibility Sensor",
                         icon = Icons.Default.Visibility,
                         accentColor = AegisPurple,
                         isGranted = false,
-                        explanation = "Detects which application is currently active in the foreground and enables the emergency 'Dismiss / Home' action when offensive content is flagged.",
-                        actionLabel = "Configure Accessibility",
+                        explanation = "Identifies foreground apps and enforces anti-tamper.",
+                        actionLabel = "Open Accessibility",
                         onAction = {
                             try {
                                 context.startActivity(PermissionHelper.getAccessibilitySettingsIntent())
@@ -205,12 +150,12 @@ fun OnboardingScreen(
 
                 item {
                     PermissionExplainerCard(
-                        title = "Background Service & Battery",
+                        title = "Battery Exemption",
                         icon = Icons.Default.BatteryChargingFull,
                         accentColor = AegisSuccessGreen,
                         isGranted = hasBatteryOpt,
-                        explanation = "Prevents aggressive Android battery management from killing the protection watchdog while you browse or watch videos.",
-                        actionLabel = if (hasBatteryOpt) "Optimization Disabled" else "Exclude from Battery Saver",
+                        explanation = "Keeps the shield watchdog active in background.",
+                        actionLabel = if (hasBatteryOpt) "Excluded" else "Allow Unrestricted",
                         onAction = {
                             try {
                                 context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context))
@@ -223,12 +168,12 @@ fun OnboardingScreen(
 
                 item {
                     PermissionExplainerCard(
-                        title = "Device Administrator (Anti-Tamper)",
+                        title = "Device Administrator",
                         icon = Icons.Default.AdminPanelSettings,
                         accentColor = AegisDangerRed,
                         isGranted = isDeviceAdmin,
-                        explanation = "Prevents unauthorized uninstalling or disabling of Sheildlenz. Deactivation is intercepted and gated by the Guardian Password.",
-                        actionLabel = if (isDeviceAdmin) "Device Admin Active" else "Activate Device Admin",
+                        explanation = "Locks uninstall and deactivation behind Guardian PIN.",
+                        actionLabel = if (isDeviceAdmin) "Active" else "Activate Admin",
                         onAction = {
                             try {
                                 context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
@@ -237,26 +182,6 @@ fun OnboardingScreen(
                             }
                         }
                     )
-                }
-
-                item {
-                    CyberCard(borderColor = AegisCardBorder) {
-                        Text(
-                            text = "Architecture & Coverage Notes",
-                            color = AegisTextPrimary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalDisplayFont
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "• DRM-Protected Content: Some encrypted streaming platforms restrict screen capture at the hardware level.\n• Local Video Players: Local media players (MP4/MKV) and web browsers are fully supported.\n• Power Efficiency: The AI pipeline subsamples frames dynamically to maximize battery longevity.",
-                            color = AegisTextMuted,
-                            fontSize = 12.sp,
-                            lineHeight = 19.sp,
-                            fontFamily = ClassicalBodyFont
-                        )
-                    }
                 }
 
                 item {
@@ -273,7 +198,7 @@ fun OnboardingScreen(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Text(
-                            text = "ENTER SHEILDLENZ DASHBOARD",
+                            text = "ENTER SHEILDLENZ HOME",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             letterSpacing = 0.9.sp,

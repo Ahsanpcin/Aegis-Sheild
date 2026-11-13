@@ -6,22 +6,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,14 +48,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.SensitivityLevel
-import com.example.core.permissions.PermissionHelper
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.detection.classifier.ModelManager
@@ -65,12 +63,10 @@ import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SheildlenzBackdrop
-import com.example.ui.components.SheildlenzScaffoldBrandBar
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisDangerRed
-import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisSuccessGreen
@@ -87,7 +83,6 @@ fun SettingsScreen(
     preferences: AegisPreferences,
     modelManager: ModelManager,
     protectionRepo: ProtectionRepository,
-    onNavigateBack: () -> Unit,
     onModelUpdated: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -111,21 +106,17 @@ fun SettingsScreen(
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
 
-    val hasOverlay = PermissionHelper.hasOverlayPermission(context)
-    val hasBattery = PermissionHelper.isIgnoringBatteryOptimizations(context)
-    val isDeviceOwner = remember(context) { AegisDeviceAdminReceiver.isDeviceOwner(context) }
     var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
 
     SheildlenzBackdrop(modifier = Modifier.testTag("settings_screen_root")) {
         Scaffold(
+            contentWindowInsets = WindowInsets.statusBars,
             topBar = {
                 CyberTopBar(
-                    title = "Sheildlenz Settings",
-                    subtitle = "Security & Guardian Policy",
-                    onNavigateBack = onNavigateBack
+                    title = "Edits",
+                    subtitle = "Model, Guardian & Thresholds"
                 )
             },
-            bottomBar = { SheildlenzScaffoldBrandBar() },
             containerColor = Color.Transparent
         ) { innerPadding ->
             LazyColumn(
@@ -133,14 +124,24 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item { Spacer(modifier = Modifier.height(2.dp)) }
-
-                // Guardian PIN Section
+                // 1. Load / Change AI Model Widget (Top)
                 item {
-                    LuxurySectionHeader(title = "Guardian Authority")
-                    Spacer(modifier = Modifier.height(10.dp))
+                    LuxurySectionHeader(title = "Load / Change AI")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ModelManagerCard(
+                        telemetry = telemetry,
+                        modelManager = modelManager,
+                        onModelUpdated = onModelUpdated
+                    )
+                }
+
+                // 2. PIN Change of Guardian
+                item {
+                    LuxurySectionHeader(title = "Guardian PIN")
+                    Spacer(modifier = Modifier.height(8.dp))
                     CyberCard(borderColor = if (hasPin) AegisChampagneGold.copy(alpha = 0.45f) else AegisWarningAmber.copy(alpha = 0.45f)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -150,24 +151,24 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(38.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(AegisPrimaryCyan.copy(alpha = 0.12f)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan, modifier = Modifier.size(19.dp))
+                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisPrimaryCyan, modifier = Modifier.size(18.dp))
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "Guardian Security PIN",
+                                        text = "Guardian PIN",
                                         color = AegisTextPrimary,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = ClassicalDisplayFont
                                     )
                                     Text(
-                                        text = if (hasPin) "Active (Locks console & admin)" else "Not Configured (Recommended)",
+                                        text = if (hasPin) "Active • Locks app & admin" else "Not configured",
                                         color = if (hasPin) AegisSuccessGreen else AegisWarningAmber,
                                         fontSize = 12.sp,
                                         fontFamily = ClassicalBodyFont
@@ -186,7 +187,9 @@ fun SettingsScreen(
                                     contentColor = if (hasPin) AegisPrimaryCyan else AegisOnPrimaryWhite
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.border(1.dp, AegisPrimaryCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                modifier = Modifier
+                                    .border(1.dp, AegisPrimaryCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                    .testTag("guardian_pin_change_button")
                             ) {
                                 Text(
                                     text = if (hasPin) "CHANGE" else "SETUP",
@@ -199,24 +202,15 @@ fun SettingsScreen(
                     }
                 }
 
-                // AI Model (.tflite) Storage Loader
+                // 3. Thresholds
                 item {
-                    ModelManagerCard(
-                        telemetry = telemetry,
-                        modelManager = modelManager,
-                        onModelUpdated = onModelUpdated
-                    )
-                }
-
-                // Detection Sensitivity Policy
-                item {
-                    LuxurySectionHeader(title = "AI Detection Thresholds")
-                    Spacer(modifier = Modifier.height(10.dp))
+                    LuxurySectionHeader(title = "Thresholds")
+                    Spacer(modifier = Modifier.height(8.dp))
                     CyberCard(borderColor = AegisCardBorder) {
                         Text(
                             text = "Detection Sensitivity",
                             color = AegisTextPrimary,
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = ClassicalDisplayFont
                         )
@@ -225,6 +219,11 @@ fun SettingsScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SensitivityLevel.entries.forEach { level ->
                                 val isSelected = (sensitivity == level)
+                                val shortCaption = when (level) {
+                                    SensitivityLevel.PERMISSIVE -> "Blocks explicit content only"
+                                    SensitivityLevel.BALANCED -> "Explicit + high-confidence suggestive"
+                                    SensitivityLevel.STRICT -> "Strictest block threshold"
+                                }
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -236,7 +235,7 @@ fun SettingsScreen(
                                             RoundedCornerShape(14.dp)
                                         )
                                         .clickable { preferences.setSensitivity(level) }
-                                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     RadioButton(
@@ -257,21 +256,18 @@ fun SettingsScreen(
                                             fontFamily = ClassicalBodyFont
                                         )
                                         Text(
-                                            text = level.detail,
+                                            text = shortCaption,
                                             color = AegisTextMuted,
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             fontFamily = ClassicalBodyFont
                                         )
                                     }
                                 }
                             }
                         }
-                    }
-                }
 
-                // Strict Everything Policy & Auto Startup Toggles
-                item {
-                    CyberCard(borderColor = AegisCardBorder) {
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 10.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -286,12 +282,10 @@ fun SettingsScreen(
                                     fontFamily = ClassicalBodyFont
                                 )
                                 Text(
-                                    text = "Instantly cast block screen even on marginal adult/provocative scores without waiting for multi-frame confirmation.",
+                                    text = "Block immediately on first match",
                                     color = AegisTextMuted,
-                                    fontSize = 12.sp,
-                                    lineHeight = 17.sp,
-                                    fontFamily = ClassicalBodyFont,
-                                    modifier = Modifier.padding(top = 2.dp)
+                                    fontSize = 11.sp,
+                                    fontFamily = ClassicalBodyFont
                                 )
                             }
                             Switch(
@@ -305,63 +299,20 @@ fun SettingsScreen(
                                 )
                             )
                         }
-
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Automatic Protection Startup",
-                                    color = AegisTextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "Automatically arm visual guardian service when Android reboots.",
-                                    color = AegisTextMuted,
-                                    fontSize = 12.sp,
-                                    fontFamily = ClassicalBodyFont,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                            Switch(
-                                checked = isAutoStart,
-                                onCheckedChange = { preferences.setAutoStart(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisPrimaryCyan,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
-                                )
-                            )
-                        }
                     }
                 }
 
-                // 10-Hour Whole-Device Lockdown & Anti-Tamper Enforcement
+                // 4. Resistance
                 item {
-                    LuxurySectionHeader(title = "Lockdown & Tamper Resistance", accentColor = AegisDangerRed)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    LuxurySectionHeader(title = "Resistance", accentColor = AegisDangerRed)
+                    Spacer(modifier = Modifier.height(8.dp))
                     CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.30f)) {
                         Text(
-                            text = "Full-Device Lockdown Penalty",
+                            text = "Lockdown Penalty: $stage1DurationLabel",
                             color = AegisDangerRed,
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = ClassicalDisplayFont
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Duration Before Master Code Unlock: $stage1DurationLabel",
-                            color = AegisTextPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = ClassicalBodyFont
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(
@@ -386,7 +337,7 @@ fun SettingsScreen(
                             }
                         }
 
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 14.dp))
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -402,9 +353,9 @@ fun SettingsScreen(
                                     fontFamily = ClassicalBodyFont
                                 )
                                 Text(
-                                    text = "Lock the entire phone for $stage1DurationLabel before Master Code entry. If the Master Code is unknown after time completes, waiting Double Time ($doubleDurationLabel) unlocks the phone while keeping Shield ON.",
+                                    text = "$stage1DurationLabel wait • $doubleDurationLabel double-time",
                                     color = AegisTextMuted,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontFamily = ClassicalBodyFont
                                 )
                             }
@@ -420,7 +371,7 @@ fun SettingsScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -436,9 +387,9 @@ fun SettingsScreen(
                                     fontFamily = ClassicalBodyFont
                                 )
                                 Text(
-                                    text = "Require Guardian Password before disabling Device Admin, Accessibility, Uninstall, or Date & Time.",
+                                    text = "Lock Admin, Accessibility & Time",
                                     color = AegisTextMuted,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontFamily = ClassicalBodyFont
                                 )
                             }
@@ -453,44 +404,74 @@ fun SettingsScreen(
                                 )
                             )
                         }
-                    }
-                }
 
-                // Protection Mode & Device Owner Status
-                item {
-                    CyberCard(
-                        borderColor = if (isDeviceOwner) AegisSuccessGreen.copy(alpha = 0.4f) else AegisElectricBlue.copy(alpha = 0.35f)
-                    ) {
-                        Text(
-                            text = "App Suspension & Intervention Mode",
-                            color = AegisTextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalBodyFont,
-                            letterSpacing = 0.8.sp
-                        )
-                        Text(
-                            text = if (isDeviceOwner) "Strict Device Owner Mode" else "Standard Mode (Accessibility & Overlay)",
-                            color = if (isDeviceOwner) AegisSuccessGreen else AegisPrimaryCyan,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalDisplayFont,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                Text(
+                                    text = "Auto-Start on Boot",
+                                    color = AegisTextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                                Text(
+                                    text = "Arm Shield after device reboot",
+                                    color = AegisTextMuted,
+                                    fontSize = 11.sp,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                            }
+                            Switch(
+                                checked = isAutoStart,
+                                onCheckedChange = { preferences.setAutoStart(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = AegisOnPrimaryWhite,
+                                    checkedTrackColor = AegisPrimaryCyan,
+                                    uncheckedThumbColor = AegisTextMuted,
+                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                )
+                            )
+                        }
 
-                        Text(
-                            text = if (isDeviceOwner) {
-                                "Device Owner privileges verified. Offending applications will be suspended at the OS kernel level via setPackagesSuspended() in addition to instant screen shielding."
-                            } else {
-                                "Running in Standard Mode. Uses Accessibility eviction (Home + Background kill) and WindowManager Overlay. Provision Device Owner via ADB for kernel-level package suspension and Safe Boot lock."
-                            },
-                            color = AegisTextMuted,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                            fontFamily = ClassicalBodyFont
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                Text(
+                                    text = "Maintenance Mode",
+                                    color = AegisDangerRed,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                                Text(
+                                    text = "Temporarily pause visual blocking",
+                                    color = AegisTextMuted,
+                                    fontSize = 11.sp,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                            }
+                            Switch(
+                                checked = isMaintenanceMode,
+                                onCheckedChange = { preferences.setMaintenanceMode(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = AegisOnPrimaryWhite,
+                                    checkedTrackColor = AegisDangerRed,
+                                    uncheckedThumbColor = AegisTextMuted,
+                                    uncheckedTrackColor = Color(0xFFCBD5E1)
+                                )
+                            )
+                        }
 
                         if (!isDeviceAdmin) {
                             Spacer(modifier = Modifier.height(12.dp))
@@ -507,139 +488,15 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) {
-                                Text("ACTIVATE DEVICE ADMINISTRATOR", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
+                                Text("ACTIVATE DEVICE ADMIN", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
                             }
-                        }
-
-                        if (!isDeviceOwner) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "To provision Device Owner (Parental / Enterprise):\nadb shell dpm set-device-owner com.ahsan.tcr.sheildlenz/com.example.security.deviceowner.AegisDeviceAdminReceiver",
-                                color = AegisTextSecondary,
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(AegisSurfaceElevated)
-                                    .border(1.dp, AegisCardBorder, RoundedCornerShape(10.dp))
-                                    .padding(10.dp)
-                            )
                         }
                     }
                 }
 
-                // Permission Health Checklist
-                item {
-                    CyberCard(borderColor = AegisCardBorder) {
-                        Text(
-                            text = "Permission Health Audit",
-                            color = AegisTextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalDisplayFont
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        PermissionHealthRow(
-                            label = "System Overlay Permission",
-                            isHealthy = hasOverlay,
-                            onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                context.startActivity(PermissionHelper.getOverlaySettingsIntent(context))
-                            }
-                        )
-                        PermissionHealthRow(
-                            label = "Device Administrator Protection",
-                            isHealthy = isDeviceAdmin,
-                            onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
-                            }
-                        )
-                        PermissionHealthRow(
-                            label = "Battery Optimization Exemption",
-                            isHealthy = hasBattery,
-                            onFix = {
-                                preferences.grantTemporarySettingsAuthorization()
-                                context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context))
-                            }
-                        )
-                    }
-                }
-
-                // Emergency Maintenance Mode
-                item {
-                    CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.30f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Emergency Maintenance Mode",
-                                    color = AegisDangerRed,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "Temporarily suppresses all visual blocking for maintenance or troubleshooting.",
-                                    color = AegisTextMuted,
-                                    fontSize = 12.sp,
-                                    fontFamily = ClassicalBodyFont,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                            Switch(
-                                checked = isMaintenanceMode,
-                                onCheckedChange = { isChecked -> preferences.setMaintenanceMode(isChecked) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisDangerRed,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = Color(0xFFCBD5E1)
-                                )
-                            )
-                        }
-                    }
-                }
-
-                // Privacy & Technology Architecture
-                item {
-                    CyberCard(borderColor = AegisCardBorder) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.PrivacyTip, contentDescription = null, tint = AegisPrimaryCyan, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Offline Architecture Specification",
-                                color = AegisPrimaryCyan,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = ClassicalDisplayFont
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Sheildlenz operates exclusively on-device without remote servers, telemetry brokers, or cloud classifiers. Frame processing is completely volatile and discarded upon classification.",
-                            color = AegisTextMuted,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                            fontFamily = ClassicalBodyFont
-                        )
-                    }
-                }
-
-                // 7-Tap Secret Advanced Precision Lab (revealed when App Version is tapped 7 times)
+                // 5. 7-Tap Secret Advanced Precision Lab (when unlocked)
                 item {
                     AdvancedPrecisionLabSection(preferences = preferences)
-                }
-
-                // App Version Card (Tap 7 times to unlock Advanced Precision Lab)
-                item {
-                    AppVersionSecretCard(preferences = preferences)
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
 
@@ -658,7 +515,7 @@ fun SettingsScreen(
                     text = {
                         Column {
                             Text(
-                                text = "Enter a 4 to 8 digit numerical passcode to safeguard Sheildlenz configuration and control unblocking.",
+                                text = "4 to 8 digit passcode for console & unlock control.",
                                 color = AegisTextSecondary,
                                 fontSize = 13.sp,
                                 fontFamily = ClassicalBodyFont
@@ -714,49 +571,6 @@ fun SettingsScreen(
                         }
                     }
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PermissionHealthRow(
-    label: String,
-    isHealthy: Boolean,
-    onFix: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = if (isHealthy) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
-                contentDescription = null,
-                tint = if (isHealthy) AegisSuccessGreen else AegisWarningAmber,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = label,
-                color = if (isHealthy) AegisTextPrimary else AegisWarningAmber,
-                fontSize = 13.sp,
-                fontFamily = ClassicalBodyFont,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        if (!isHealthy) {
-            OutlinedButton(
-                onClick = onFix,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = AegisPrimaryCyan),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text(text = "FIX", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
             }
         }
     }

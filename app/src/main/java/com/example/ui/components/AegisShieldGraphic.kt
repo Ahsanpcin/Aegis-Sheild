@@ -1,18 +1,27 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -24,6 +33,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.AegisChampagneGold
@@ -36,6 +46,7 @@ import com.example.ui.theme.AegisRedGlow
 import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
+import kotlinx.coroutines.launch
 
 @Composable
 fun AegisShieldGraphic(
@@ -65,14 +76,68 @@ fun AegisShieldGraphic(
         label = "ApertureRotation"
     )
 
+    val activationProgress by animateFloatAsState(
+        targetValue = if (isProtected || isThreatActive) 1f else 0f,
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "ActivationProgress"
+    )
+
+    val crestScale = remember { Animatable(1f) }
+    val waveProgress = remember { Animatable(0f) }
+    var lastProtectedState by remember { mutableStateOf<Boolean?>(null) }
+    var waveDirection by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(isProtected) {
+        val prev = lastProtectedState
+        lastProtectedState = isProtected
+        if (prev != null && prev != isProtected) {
+            waveDirection = if (isProtected) 1 else -1
+            launch {
+                crestScale.snapTo(if (isProtected) 0.88f else 1.06f)
+                crestScale.animateTo(
+                    targetValue = if (isProtected) 1.08f else 0.94f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                )
+                crestScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+            }
+            launch {
+                waveProgress.snapTo(0f)
+                waveProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 680, easing = FastOutSlowInEasing)
+                )
+                waveDirection = 0
+            }
+        }
+    }
+
     val primaryColor by animateColorAsState(
         targetValue = when {
             isThreatActive -> AegisDangerRed
             isProtected -> AegisPrimaryCyan
             else -> AegisTextMuted
         },
-        animationSpec = tween(450),
+        animationSpec = tween(480),
         label = "ShieldPrimaryColor"
+    )
+
+    val rimSecondaryColor by animateColorAsState(
+        targetValue = when {
+            isThreatActive -> AegisDangerRed.copy(alpha = 0.72f)
+            isProtected -> AegisElectricBlue
+            else -> AegisTextMuted.copy(alpha = 0.65f)
+        },
+        animationSpec = tween(480),
+        label = "ShieldRimSecondaryColor"
     )
 
     val lensAccent by animateColorAsState(
@@ -81,7 +146,7 @@ fun AegisShieldGraphic(
             isProtected -> AegisOpticalTeal
             else -> AegisTextMuted.copy(alpha = 0.6f)
         },
-        animationSpec = tween(450),
+        animationSpec = tween(480),
         label = "LensAccentColor"
     )
 
@@ -91,7 +156,7 @@ fun AegisShieldGraphic(
             isProtected -> AegisSuccessGreen
             else -> AegisTextMuted
         },
-        animationSpec = tween(450),
+        animationSpec = tween(480),
         label = "CoreDotColor"
     )
 
@@ -101,12 +166,17 @@ fun AegisShieldGraphic(
             isProtected -> AegisCyanGlow
             else -> Color.Transparent
         },
-        animationSpec = tween(450),
+        animationSpec = tween(480),
         label = "ShieldGlowColor"
     )
 
     Box(
-        modifier = modifier.size(size),
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                scaleX = crestScale.value
+                scaleY = crestScale.value
+            },
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
@@ -114,28 +184,46 @@ fun AegisShieldGraphic(
             val height = this.size.height
             val center = Offset(width * 0.5f, height * 0.49f)
 
-            // Outer radial sanctuary halo
-            if (isProtected || isThreatActive) {
+            // Smooth radial sanctuary halo on ON / Threat transitions
+            if (activationProgress > 0.01f && glowColor.alpha > 0f) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            glowColor.copy(alpha = glowColor.alpha * 1.4f * pulseAlpha),
-                            AegisChampagneGold.copy(alpha = 0.06f * pulseAlpha),
+                            glowColor.copy(alpha = glowColor.alpha * 1.4f * pulseAlpha * activationProgress),
+                            AegisChampagneGold.copy(alpha = 0.07f * pulseAlpha * activationProgress),
                             Color.Transparent
                         ),
                         center = center,
-                        radius = width * 0.54f
+                        radius = width * (0.42f + 0.14f * activationProgress)
                     ),
-                    radius = width * 0.54f,
+                    radius = width * (0.42f + 0.14f * activationProgress),
                     center = center
+                )
+            }
+
+            // ON / OFF transition shockwave or power-down contraction ring
+            if (waveDirection != 0 && waveProgress.value in 0.01f..0.99f) {
+                val p = waveProgress.value
+                val waveRadius = if (waveDirection > 0) {
+                    width * (0.20f + 0.36f * p)
+                } else {
+                    width * (0.50f - 0.30f * p)
+                }
+                val waveAlpha = (1f - p) * 0.65f
+                val waveColor = if (waveDirection > 0) AegisSuccessGreen else AegisTextMuted
+                drawCircle(
+                    color = waveColor.copy(alpha = waveAlpha),
+                    radius = waveRadius,
+                    center = center,
+                    style = Stroke(width = (3.dp.toPx() * (1f - p * 0.5f)))
                 )
             }
 
             // Soft concentric orbital hairline ring
             drawCircle(
                 color = (if (isThreatActive) AegisDangerRed else AegisChampagneGold)
-                    .copy(alpha = if (isProtected || isThreatActive) 0.25f * pulseAlpha else 0.12f),
-                radius = width * 0.48f,
+                    .copy(alpha = 0.12f + (0.16f * pulseAlpha * activationProgress)),
+                radius = width * (0.45f + 0.03f * activationProgress),
                 center = center,
                 style = Stroke(width = 1.dp.toPx())
             )
@@ -206,7 +294,7 @@ fun AegisShieldGraphic(
             drawPath(
                 path = innerPath,
                 color = if (isThreatActive) AegisDangerRed.copy(alpha = 0.50f)
-                else AegisChampagneGold.copy(alpha = if (isProtected) 0.72f else 0.35f),
+                else AegisChampagneGold.copy(alpha = 0.35f + 0.40f * activationProgress),
                 style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
 
@@ -216,7 +304,7 @@ fun AegisShieldGraphic(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         primaryColor,
-                        if (isProtected && !isThreatActive) AegisElectricBlue else primaryColor.copy(alpha = 0.65f)
+                        rimSecondaryColor
                     )
                 ),
                 style = Stroke(width = 3.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -225,7 +313,7 @@ fun AegisShieldGraphic(
             // Center Optical Lens Housing (Sheildlenz signature motif)
             val lensCenter = Offset(width * 0.5f, height * 0.47f)
             val outerLensRadius = width * 0.21f
-            val innerLensRadius = width * 0.125f
+            val innerLensRadius = width * (0.115f + 0.015f * activationProgress)
 
             drawCircle(
                 brush = Brush.radialGradient(
@@ -240,15 +328,15 @@ fun AegisShieldGraphic(
                 center = lensCenter
             )
 
-            // Rotating segmented optical iris arcs when active
+            // Rotating segmented optical iris arcs expanding & spinning when ON
             val arcTopLeft = Offset(lensCenter.x - outerLensRadius * 0.78f, lensCenter.y - outerLensRadius * 0.78f)
             val arcSize = Size(outerLensRadius * 1.56f, outerLensRadius * 1.56f)
-            rotate(degrees = if (isProtected) apertureAngle else 0f, pivot = lensCenter) {
+            rotate(degrees = apertureAngle * activationProgress, pivot = lensCenter) {
                 for (i in 0 until 4) {
                     drawArc(
-                        color = lensAccent.copy(alpha = if (isProtected) 0.85f else 0.45f),
+                        color = lensAccent.copy(alpha = 0.45f + 0.42f * activationProgress),
                         startAngle = i * 90f + 10f,
-                        sweepAngle = 55f,
+                        sweepAngle = 32f + 26f * activationProgress,
                         useCenter = false,
                         topLeft = arcTopLeft,
                         size = arcSize,
@@ -262,7 +350,7 @@ fun AegisShieldGraphic(
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color.White.copy(alpha = 0.95f),
-                        lensAccent.copy(alpha = 0.9f),
+                        lensAccent.copy(alpha = 0.85f + 0.10f * activationProgress),
                         primaryColor
                     ),
                     center = Offset(lensCenter.x - innerLensRadius * 0.28f, lensCenter.y - innerLensRadius * 0.28f),
@@ -275,7 +363,7 @@ fun AegisShieldGraphic(
             // Specular crystal highlight & status pupil
             drawCircle(
                 color = coreDotColor,
-                radius = innerLensRadius * 0.38f,
+                radius = innerLensRadius * (0.34f + 0.06f * activationProgress),
                 center = lensCenter
             )
             drawCircle(

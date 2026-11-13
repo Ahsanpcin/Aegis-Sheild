@@ -92,7 +92,7 @@ fun AppVersionSecretCard(
                 if (isUnlocked) {
                     Toast.makeText(
                         context,
-                        "Advanced Precision Lab is already open above.",
+                        "Advanced Precision Lab is open below (and in Edits).",
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
@@ -157,9 +157,9 @@ fun AppVersionSecretCard(
                     )
                     Text(
                         text = when {
-                            isUnlocked -> "Advanced Precision Lab unlocked • Full customization active"
-                            versionTapCount in 1..6 -> "Tap $remainingTaps more time${if (remainingTaps == 1) "" else "s"} to open Advanced Precision Lab"
-                            else -> "Tap version 7 times to unlock precision customizations"
+                            isUnlocked -> "Precision Lab unlocked"
+                            versionTapCount in 1..6 -> "$remainingTaps more tap${if (remainingTaps == 1) "" else "s"} for Precision Lab"
+                            else -> "Tap 7 times for Precision Lab"
                         },
                         color = when {
                             isUnlocked -> AegisChampagneGold
@@ -412,7 +412,7 @@ fun AdvancedPrecisionLabSection(
 
                 LabSwitchRow(
                     title = "Custom Confidence Override",
-                    subtitle = "Override sensitivity preset with exact Explicit & Suggestive % thresholds.",
+                    subtitle = "Set exact Explicit & Suggestive % cutoffs",
                     checked = customThresholdsEnabled,
                     onCheckedChange = { preferences.setCustomThresholdsEnabled(it) }
                 )
@@ -457,16 +457,10 @@ fun AdvancedPrecisionLabSection(
                 HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 10.dp))
 
                 Text(
-                    text = "Consecutive Suggestive Frames Required: $consecutiveFramesRequired",
+                    text = "Consecutive Suggestive Frames: $consecutiveFramesRequired",
                     color = AegisTextPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = ClassicalBodyFont
-                )
-                Text(
-                    text = "Higher values reduce accidental blocks during fast scrolling; 1F blocks on the very first match.",
-                    color = AegisTextMuted,
-                    fontSize = 11.sp,
                     fontFamily = ClassicalBodyFont
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -488,7 +482,7 @@ fun AdvancedPrecisionLabSection(
 
                 LabSwitchRow(
                     title = "Skip Duplicate Static Frames",
-                    subtitle = "Conserve battery by skipping AI inference when screen pixels have not changed.",
+                    subtitle = "Save battery on unchanged screens",
                     checked = skipDuplicateFrames,
                     onCheckedChange = { preferences.setSkipDuplicateFrames(it) }
                 )
@@ -606,7 +600,7 @@ fun AdvancedPrecisionLabSection(
 
                 LabSwitchRow(
                     title = "Evict & Kill Offending App",
-                    subtitle = "Immediately send user Home and terminate offending app process on detection.",
+                    subtitle = "Send Home & close offending app",
                     checked = evictAppOnThreat,
                     onCheckedChange = { preferences.setEvictAppOnThreat(it) }
                 )
@@ -615,7 +609,7 @@ fun AdvancedPrecisionLabSection(
 
                 LabSwitchRow(
                     title = "Emergency Dialer on Lockscreen",
-                    subtitle = "Display Emergency Dialer button during full-device lockdown.",
+                    subtitle = "Show Emergency button during lockdown",
                     checked = showEmergencyDialer,
                     onCheckedChange = { preferences.setShowEmergencyDialerOnLockdown(it) }
                 )

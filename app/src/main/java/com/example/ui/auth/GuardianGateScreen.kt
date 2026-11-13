@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.ui.components.AegisShieldGraphic
-import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.CyberCard
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
@@ -192,10 +191,6 @@ fun GuardianGateScreen(
                     )
                 }
             }
-            }
-
-            Box(modifier = Modifier.padding(top = 20.dp, bottom = 6.dp)) {
-                AhsanTcrBrandingPill()
             }
         }
     }

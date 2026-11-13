@@ -62,7 +62,6 @@ import com.example.core.models.ThreatCategory
 import com.example.data.preferences.AegisPreferences
 import com.example.services.protection.AegisLockdownService
 import com.example.ui.components.AegisShieldGraphic
-import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.CyberCard
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
@@ -282,9 +281,7 @@ fun BlockOverlayScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
-
-            AhsanTcrBrandingPill()
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         if (showPinDialog) {

@@ -20,7 +20,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.res.ResourcesCompat
 import com.example.MainActivity
+import com.example.R
 import com.example.core.models.ThreatCategory
 import com.example.core.permissions.PermissionHelper
 import com.example.data.preferences.AegisPreferences
@@ -35,6 +37,9 @@ class SystemOverlayController(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val displayTypeface: Typeface by lazy {
+        ResourcesCompat.getFont(context, R.font.space_grotesk) ?: Typeface.SANS_SERIF
+    }
     private var overlayView: View? = null
 
     private var countdownTitleView: TextView? = null
@@ -209,7 +214,7 @@ class SystemOverlayController(private val context: Context) {
             text = "SHEILDLENZ • FULL DEVICE LOCKDOWN"
             setTextColor(Color.parseColor("#C81E3A"))
             textSize = 11f
-            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
             background = roundedBox("#FDECEF", "#F5B8C4", 50f)
             setPadding(36, 14, 36, 14)
@@ -220,7 +225,7 @@ class SystemOverlayController(private val context: Context) {
             text = "Device Locked for Safety"
             setTextColor(Color.parseColor("#0B1324"))
             textSize = 26f
-            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
             setPadding(0, 28, 0, 6)
         }
@@ -501,7 +506,7 @@ class SystemOverlayController(private val context: Context) {
             text = "Guardian Authorization Required"
             setTextColor(Color.parseColor("#0B1324"))
             textSize = 23f
-            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
             setPadding(0, 26, 0, 12)
         }
@@ -599,7 +604,7 @@ class SystemOverlayController(private val context: Context) {
             text = "Built By AhsanTCr  •  ahsantcr.lovable.app"
             setTextColor(Color.parseColor("#1A3A7A"))
             textSize = 11f
-            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            typeface = Typeface.create(displayTypeface, Typeface.BOLD)
             gravity = Gravity.CENTER
             background = roundedBox("#FFFFFF", "#E5C170", 50f)
             setPadding(34, 16, 34, 16)
