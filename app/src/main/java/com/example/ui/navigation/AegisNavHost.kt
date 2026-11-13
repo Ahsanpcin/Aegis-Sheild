@@ -1,6 +1,5 @@
 package com.example.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.di.AegisContainer
+import com.example.ui.auth.GuardianGateScreen
 import com.example.ui.blocking.BlockOverlayScreen
 import com.example.ui.dashboard.DashboardScreen
 import com.example.ui.history.SecurityHistoryScreen
@@ -30,6 +30,10 @@ fun AegisNavHost(
     onRequestStopProtection: () -> Unit = {}
 ) {
     val isOnboardingDone by container.preferences.isOnboardingCompleted.collectAsState()
+    val hasGuardianPin by container.preferences.hasGuardianPin.collectAsState()
+    val isGuardianUnlocked by container.preferences.isGuardianSessionUnlocked.collectAsState()
+
+    val isGuardianAuthorized = !hasGuardianPin || isGuardianUnlocked
 
     NavHost(
         navController = navController,
@@ -63,47 +67,80 @@ fun AegisNavHost(
         }
 
         composable(AegisDestinations.DASHBOARD) {
-            DashboardScreen(
-                protectionRepo = container.protectionRepository,
-                historyRepo = container.securityHistoryRepository,
-                modelManager = container.modelManager,
-                onNavigateToLive = { navController.navigate(AegisDestinations.LIVE_PROTECTION) },
-                onNavigateToHistory = { navController.navigate(AegisDestinations.SECURITY_HISTORY) },
-                onNavigateToSettings = { navController.navigate(AegisDestinations.SETTINGS) },
-                onNavigateToBlockScreen = { navController.navigate(AegisDestinations.BLOCK_SCREEN) },
-                onModelUpdated = { container.refreshModelTelemetry() },
-                onRequestStartProtection = onRequestStartProtection,
-                onRequestStopProtection = onRequestStopProtection
-            )
+            if (!isGuardianAuthorized) {
+                GuardianGateScreen(
+                    preferences = container.preferences,
+                    protectionRepo = container.protectionRepository,
+                    onUnlocked = { }
+                )
+            } else {
+                DashboardScreen(
+                    protectionRepo = container.protectionRepository,
+                    historyRepo = container.securityHistoryRepository,
+                    modelManager = container.modelManager,
+                    preferences = container.preferences,
+                    onNavigateToLive = { navController.navigate(AegisDestinations.LIVE_PROTECTION) },
+                    onNavigateToHistory = { navController.navigate(AegisDestinations.SECURITY_HISTORY) },
+                    onNavigateToSettings = { navController.navigate(AegisDestinations.SETTINGS) },
+                    onNavigateToBlockScreen = { navController.navigate(AegisDestinations.BLOCK_SCREEN) },
+                    onModelUpdated = { container.refreshModelTelemetry() },
+                    onRequestStartProtection = onRequestStartProtection,
+                    onRequestStopProtection = onRequestStopProtection
+                )
+            }
         }
 
         composable(AegisDestinations.LIVE_PROTECTION) {
-            LiveProtectionScreen(
-                protectionRepo = container.protectionRepository,
-                historyRepo = container.securityHistoryRepository,
-                modelManager = container.modelManager,
-                preferences = container.preferences,
-                onNavigateBack = { navController.popBackStack() },
-                onTriggerBlockOverlay = { navController.navigate(AegisDestinations.BLOCK_SCREEN) },
-                onModelUpdated = { container.refreshModelTelemetry() }
-            )
+            if (!isGuardianAuthorized) {
+                GuardianGateScreen(
+                    preferences = container.preferences,
+                    protectionRepo = container.protectionRepository,
+                    onUnlocked = { }
+                )
+            } else {
+                LiveProtectionScreen(
+                    protectionRepo = container.protectionRepository,
+                    historyRepo = container.securityHistoryRepository,
+                    modelManager = container.modelManager,
+                    preferences = container.preferences,
+                    onNavigateBack = { navController.popBackStack() },
+                    onTriggerBlockOverlay = { navController.navigate(AegisDestinations.BLOCK_SCREEN) },
+                    onModelUpdated = { container.refreshModelTelemetry() }
+                )
+            }
         }
 
         composable(AegisDestinations.SECURITY_HISTORY) {
-            SecurityHistoryScreen(
-                historyRepo = container.securityHistoryRepository,
-                onNavigateBack = { navController.popBackStack() }
-            )
+            if (!isGuardianAuthorized) {
+                GuardianGateScreen(
+                    preferences = container.preferences,
+                    protectionRepo = container.protectionRepository,
+                    onUnlocked = { }
+                )
+            } else {
+                SecurityHistoryScreen(
+                    historyRepo = container.securityHistoryRepository,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
 
         composable(AegisDestinations.SETTINGS) {
-            SettingsScreen(
-                preferences = container.preferences,
-                modelManager = container.modelManager,
-                protectionRepo = container.protectionRepository,
-                onNavigateBack = { navController.popBackStack() },
-                onModelUpdated = { container.refreshModelTelemetry() }
-            )
+            if (!isGuardianAuthorized) {
+                GuardianGateScreen(
+                    preferences = container.preferences,
+                    protectionRepo = container.protectionRepository,
+                    onUnlocked = { }
+                )
+            } else {
+                SettingsScreen(
+                    preferences = container.preferences,
+                    modelManager = container.modelManager,
+                    protectionRepo = container.protectionRepository,
+                    onNavigateBack = { navController.popBackStack() },
+                    onModelUpdated = { container.refreshModelTelemetry() }
+                )
+            }
         }
 
         composable(AegisDestinations.BLOCK_SCREEN) {

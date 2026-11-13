@@ -46,6 +46,7 @@ import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisVoidBackground
+import com.example.ui.theme.ClassicalDisplayFont
 import kotlinx.coroutines.delay
 
 @Composable
@@ -122,10 +123,10 @@ fun SplashScreen(
             Text(
                 text = "AEGIS SHIELD",
                 color = AegisTextPrimary,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 4.sp,
-                fontFamily = FontFamily.SansSerif
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 3.sp,
+                fontFamily = ClassicalDisplayFont
             )
 
             Text(

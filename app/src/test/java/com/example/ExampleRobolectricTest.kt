@@ -314,4 +314,66 @@ class ExampleRobolectricTest {
         assertEquals(299 * 299 * 3, uint8Buffer.capacity())
         assertTrue(preprocessor.isQuantizedUInt8)
     }
+
+    @Test
+    fun `preferences enforces 10 hour lockdown cooldown before password and stores forensics`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.clearLockdown()
+
+        assertEquals(10, prefs.lockdownHours.value)
+        assertTrue(prefs.waitCooldownBeforePassword.value)
+        assertFalse(prefs.isLockdownActive())
+
+        val until = prefs.engageFullDeviceLockdown(
+            appName = "Chrome Browser",
+            packageName = "com.android.chrome",
+            categoryName = "Explicit Adult Content",
+            details = "Explicit: 94% (Porn: 90%, Hentai: 4%)"
+        )
+
+        assertTrue(until > System.currentTimeMillis())
+        assertTrue(prefs.isLockdownActive())
+        assertTrue(prefs.getRemainingLockdownMillis() > 9 * 60 * 60 * 1000L)
+        assertFalse(prefs.canAcceptPasswordForLockdown())
+
+        val info = prefs.lockdownIncidentInfo.value
+        assertEquals("Chrome Browser", info.appName)
+        assertEquals("com.android.chrome", info.packageName)
+        assertTrue(info.details.contains("94%"))
+
+        prefs.clearLockdown()
+        assertFalse(prefs.isLockdownActive())
+    }
+
+    @Test
+    fun `guardian session locks on leave and blocks system settings without pin authorization`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.clearLockdown()
+        prefs.setGuardianPin("4321")
+
+        assertTrue(prefs.isGuardianSessionUnlocked.value)
+        assertTrue(prefs.isGuardianAuthorizedForSystemSettings())
+
+        prefs.lockGuardianSession()
+        assertFalse(prefs.isGuardianSessionUnlocked.value)
+        assertFalse(prefs.isGuardianAuthorizedForSystemSettings())
+
+        prefs.unlockGuardianSession()
+        assertTrue(prefs.isGuardianSessionUnlocked.value)
+        assertTrue(prefs.isGuardianAuthorizedForSystemSettings())
+    }
+
+    @Test
+    fun `device admin disable requested returns anti-tamper guardian message`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+        prefs.setGuardianPin("4321")
+        prefs.lockGuardianSession()
+
+        val receiver = AegisDeviceAdminReceiver()
+        val msg = receiver.onDisableRequested(context, android.content.Intent())
+        assertTrue(msg.toString().contains("Guardian Password", ignoreCase = true))
+    }
 }

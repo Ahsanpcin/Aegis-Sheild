@@ -64,6 +64,7 @@ import com.example.ui.components.AegisShieldGraphic
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisRedGlow
 import com.example.ui.theme.AegisSecondaryBackground
@@ -71,6 +72,7 @@ import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisVoidBackground
+import com.example.ui.theme.ClassicalDisplayFont
 
 @Composable
 fun BlockOverlayScreen(
@@ -107,7 +109,7 @@ fun BlockOverlayScreen(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         AegisVoidBackground,
-                        Color(0xFF1A070B),
+                        Color(0xFFFCEEEF),
                         AegisVoidBackground
                     )
                 )
@@ -163,10 +165,10 @@ fun BlockOverlayScreen(
             Text(
                 text = "CONTENT BLOCKED",
                 color = AegisTextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp,
-                fontFamily = FontFamily.SansSerif
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                fontFamily = ClassicalDisplayFont
             )
 
             Text(
@@ -229,7 +231,7 @@ fun BlockOverlayScreen(
                     .testTag("block_screen_return_home_button"),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AegisDangerRed,
-                    contentColor = AegisTextPrimary
+                    contentColor = AegisOnPrimaryWhite
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -323,7 +325,10 @@ fun BlockOverlayScreen(
                                 pinError = "Incorrect Guardian PIN"
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisVoidBackground)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AegisPrimaryCyan,
+                            contentColor = AegisOnPrimaryWhite
+                        )
                     ) {
                         Text("VERIFY & UNBLOCK", fontWeight = FontWeight.Bold)
                     }

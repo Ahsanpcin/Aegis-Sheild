@@ -62,6 +62,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.filled.Lock
+import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
 import com.example.detection.classifier.ModelImportResult
@@ -73,13 +75,16 @@ import com.example.ui.components.MetricTile
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.StatusPill
 import com.example.ui.components.ThreatCategoryBadge
+import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
+import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
@@ -97,6 +102,7 @@ fun DashboardScreen(
     protectionRepo: ProtectionRepository,
     historyRepo: SecurityHistoryRepository,
     modelManager: ModelManager,
+    preferences: AegisPreferences,
     onNavigateToLive: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -108,6 +114,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val telemetry by protectionRepo.telemetry.collectAsState()
+    val hasGuardianPin by preferences.hasGuardianPin.collectAsState()
     val totalDetections by historyRepo.getTotalDetectionsCount().collectAsState(initial = 0)
     val blockedAppCount by historyRepo.getBlockedAppCount().collectAsState(initial = 0)
     val latestIncident by historyRepo.getLatestIncident().collectAsState(initial = null)
@@ -274,12 +281,40 @@ fun DashboardScreen(
                             },
                             modifier = Modifier.testTag("master_protection_switch"),
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = AegisVoidBackground,
+                                checkedThumbColor = AegisOnPrimaryWhite,
                                 checkedTrackColor = AegisPrimaryCyan,
                                 uncheckedThumbColor = AegisTextMuted,
-                                uncheckedTrackColor = Color(0xFF1E293B)
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
                             )
                         )
+                    }
+                }
+            }
+
+            if (!hasGuardianPin) {
+                item {
+                    CyberCard(
+                        borderColor = AegisWarningAmber.copy(alpha = 0.45f),
+                        onClick = onNavigateToSettings
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisWarningAmber, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "SET GUARDIAN PASSWORD",
+                                    color = AegisWarningAmber,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "Tap to configure a Guardian PIN so only the Guardian can open/change the app or disable Device Admin.",
+                                    color = AegisTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -428,6 +463,15 @@ fun DashboardScreen(
                             }
                             ThreatCategoryBadge(category = incident.category)
                         }
+                        if (incident.diagnosticSummary.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = incident.diagnosticSummary,
+                                color = AegisTextSecondary,
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = AegisTextMuted, modifier = Modifier.size(16.dp))
@@ -451,7 +495,7 @@ fun DashboardScreen(
                     Button(
                         onClick = onNavigateToLive,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AegisSecondaryBackground,
+                            containerColor = AegisCardBackground,
                             contentColor = AegisPrimaryCyan
                         ),
                         shape = RoundedCornerShape(12.dp),
@@ -469,7 +513,7 @@ fun DashboardScreen(
                     Button(
                         onClick = onNavigateToBlockScreen,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AegisSecondaryBackground,
+                            containerColor = AegisCardBackground,
                             contentColor = AegisDangerRed
                         ),
                         shape = RoundedCornerShape(12.dp),
@@ -491,7 +535,7 @@ fun DashboardScreen(
         if (showOverlayWarningDialog) {
             AlertDialog(
                 onDismissRequest = { showOverlayWarningDialog = false },
-                containerColor = AegisSecondaryBackground,
+                containerColor = AegisCardBackground,
                 titleContentColor = AegisTextPrimary,
                 textContentColor = AegisTextSecondary,
                 title = { Text("Overlay Permission Required") },
@@ -510,7 +554,7 @@ fun DashboardScreen(
                                 context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisVoidBackground)
+                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)
                     ) {
                         Text("GRANT PERMISSION", fontWeight = FontWeight.Bold)
                     }
@@ -529,7 +573,7 @@ fun DashboardScreen(
         if (showMissingModelDialog) {
             AlertDialog(
                 onDismissRequest = { showMissingModelDialog = false },
-                containerColor = AegisSecondaryBackground,
+                containerColor = AegisCardBackground,
                 titleContentColor = AegisTextPrimary,
                 textContentColor = AegisTextSecondary,
                 title = { Text("No AI Model Loaded") },
@@ -544,7 +588,7 @@ fun DashboardScreen(
                             showMissingModelDialog = false
                             quickModelPickerLauncher.launch(arrayOf("*/*"))
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisVoidBackground)
+                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)
                     ) {
                         Text("LOAD .TFLITE", fontWeight = FontWeight.Bold)
                     }

@@ -1,10 +1,12 @@
 package com.example
 
 import android.content.Context
+import android.graphics.Color
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.di.AegisContainer
+import com.example.services.protection.AegisLockdownService
 import com.example.services.protection.AegisProtectionService
 import com.example.ui.navigation.AegisNavHost
 import com.example.ui.theme.AegisShieldTheme
@@ -35,7 +38,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        )
         setContent {
             AegisShieldTheme {
                 Surface(
@@ -70,5 +76,16 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         container.protectionRepository.refreshPermissionHealth()
+        if (container.preferences.isLockdownActive()) {
+            AegisLockdownService.start(this)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Require Guardian re-authentication whenever the app leaves the foreground
+        if (!isChangingConfigurations) {
+            container.preferences.onAppBackgrounded()
+        }
     }
 }

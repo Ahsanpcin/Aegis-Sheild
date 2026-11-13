@@ -23,12 +23,14 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisCyanGlow
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisRedGlow
 import com.example.ui.theme.AegisSecondaryBackground
+import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
 
 @Composable
@@ -40,8 +42,8 @@ fun AegisShieldGraphic(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "ShieldPulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
+        initialValue = 0.45f,
+        targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -57,6 +59,16 @@ fun AegisShieldGraphic(
         },
         animationSpec = tween(500),
         label = "ShieldPrimaryColor"
+    )
+
+    val secondaryAccent by animateColorAsState(
+        targetValue = when {
+            isThreatActive -> AegisDangerRed
+            isProtected -> AegisSuccessGreen
+            else -> AegisTextMuted
+        },
+        animationSpec = tween(500),
+        label = "ShieldSecondaryColor"
     )
 
     val glowColor by animateColorAsState(
@@ -77,40 +89,35 @@ fun AegisShieldGraphic(
             val width = this.size.width
             val height = this.size.height
 
-            // Outer Glow Halo
             if (isProtected || isThreatActive) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(glowColor.copy(alpha = glowColor.alpha * pulseAlpha), Color.Transparent),
                         center = Offset(width / 2f, height / 2f),
-                        radius = width * 0.52f
+                        radius = width * 0.54f
                     ),
-                    radius = width * 0.52f
+                    radius = width * 0.54f
                 )
             }
 
-            // Shield Geometry
+            // Classical Heraldic Crest Geometry
             val path = Path().apply {
                 moveTo(width * 0.5f, height * 0.08f)
-                // Top right crest
                 cubicTo(
                     width * 0.72f, height * 0.08f,
                     width * 0.88f, height * 0.16f,
                     width * 0.90f, height * 0.30f
                 )
-                // Right body curving to bottom apex
                 cubicTo(
                     width * 0.90f, height * 0.62f,
                     width * 0.68f, height * 0.82f,
                     width * 0.5f, height * 0.94f
                 )
-                // Left body from bottom apex
                 cubicTo(
                     width * 0.32f, height * 0.82f,
                     width * 0.10f, height * 0.62f,
                     width * 0.10f, height * 0.30f
                 )
-                // Top left crest
                 cubicTo(
                     width * 0.12f, height * 0.16f,
                     width * 0.28f, height * 0.08f,
@@ -119,18 +126,18 @@ fun AegisShieldGraphic(
                 close()
             }
 
-            // Background Fill
+            // Luminous Porcelain Interior Gradient
             drawPath(
                 path = path,
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        AegisSecondaryBackground.copy(alpha = 0.95f),
-                        Color(0xFF0D1322)
+                        Color.White,
+                        AegisSecondaryBackground
                     )
                 )
             )
 
-            // Inner Accent Mesh (Futuristic circuitry)
+            // Inner Classical Crest Filigree
             val innerPath = Path().apply {
                 moveTo(width * 0.5f, height * 0.20f)
                 lineTo(width * 0.78f, height * 0.36f)
@@ -143,42 +150,41 @@ fun AegisShieldGraphic(
 
             drawPath(
                 path = innerPath,
-                color = primaryColor.copy(alpha = if (isProtected) 0.12f else 0.04f)
+                color = primaryColor.copy(alpha = if (isProtected) 0.07f else 0.03f)
             )
 
             drawPath(
                 path = innerPath,
-                color = primaryColor.copy(alpha = 0.4f),
+                color = if (isProtected && !isThreatActive) AegisChampagneGold.copy(alpha = 0.65f) else primaryColor.copy(alpha = 0.45f),
                 style = Stroke(
-                    width = 2.dp.toPx(),
+                    width = 1.8.dp.toPx(),
                     cap = StrokeCap.Round,
                     join = StrokeJoin.Round
                 )
             )
 
-            // Core Lock / Core Node
+            // Classical Core Emblem
             drawCircle(
-                color = primaryColor,
+                color = secondaryAccent,
                 radius = 7.dp.toPx(),
                 center = Offset(width * 0.5f, height * 0.46f)
             )
 
-            // Vertical Energy Core Line
             drawLine(
-                color = primaryColor.copy(alpha = 0.8f),
+                color = primaryColor.copy(alpha = 0.85f),
                 start = Offset(width * 0.5f, height * 0.46f),
                 end = Offset(width * 0.5f, height * 0.72f),
                 strokeWidth = 3.dp.toPx(),
                 cap = StrokeCap.Round
             )
 
-            // External Shield Outline Stroke
+            // Outer Heraldic Border
             drawPath(
                 path = path,
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         primaryColor,
-                        if (isProtected) AegisElectricBlue else primaryColor.copy(alpha = 0.5f)
+                        if (isProtected) AegisElectricBlue else primaryColor.copy(alpha = 0.55f)
                     )
                 ),
                 style = Stroke(

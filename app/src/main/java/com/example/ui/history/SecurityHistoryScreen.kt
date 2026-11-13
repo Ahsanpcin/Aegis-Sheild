@@ -58,10 +58,12 @@ import com.example.ui.components.ThreatCategoryBadge
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
+import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
@@ -202,7 +204,10 @@ fun SecurityHistoryScreen(
                                 showClearDialog = false
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = AegisDangerRed)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AegisDangerRed,
+                            contentColor = AegisOnPrimaryWhite
+                        )
                     ) {
                         Text(text = "PURGE LOG", fontWeight = FontWeight.Bold)
                     }
@@ -280,6 +285,36 @@ fun IncidentItemCard(
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace
         )
+
+        if (incident.diagnosticSummary.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(AegisSurfaceElevated)
+                    .border(1.dp, AegisCardBorder, RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            ) {
+                Text(
+                    text = incident.diagnosticSummary,
+                    color = AegisTextPrimary,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+
+        if (incident.lockdownDurationMinutes > 0) {
+            Text(
+                text = "Lockdown Penalty Enforced: ${incident.lockdownDurationMinutes / 60} Hours",
+                color = AegisDangerRed,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.height(6.dp))
 

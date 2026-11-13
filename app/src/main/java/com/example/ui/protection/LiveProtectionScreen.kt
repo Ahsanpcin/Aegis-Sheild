@@ -303,7 +303,8 @@ fun LiveProtectionScreen(
                                         category = ThreatCategory.EXPLICIT_ADULT,
                                         severity = ThreatSeverity.CRITICAL,
                                         confidenceScore = 0.96f,
-                                        actionTaken = "System Shield Cast & Tab Dismissed"
+                                        actionTaken = "Simulation Preview • System Shield Cast",
+                                        diagnosticSummary = "Simulated Explicit Detection (96% confidence) • Preview mode does not engage 10h device lock."
                                     )
                                     historyRepo.logIncident(simulatedIncident)
                                     protectionRepo.recordDetection(ThreatCategory.EXPLICIT_ADULT)
@@ -311,7 +312,7 @@ fun LiveProtectionScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = AegisDangerRed.copy(alpha = 0.2f),
+                                containerColor = AegisDangerRed.copy(alpha = 0.12f),
                                 contentColor = AegisDangerRed
                             ),
                             shape = RoundedCornerShape(8.dp),

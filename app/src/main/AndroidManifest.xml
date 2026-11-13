@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -37,7 +38,13 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
-        <!-- Foreground Application Monitor via Accessibility -->
+        <!-- Persistent 10-Hour Lockdown Watchdog Service -->
+        <service
+            android:name=".services.protection.AegisLockdownService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Foreground Application Monitor & Anti-Tamper Service -->
         <service
             android:name=".monitoring.accessibility.AegisAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -50,7 +57,7 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Device Admin Receiver for Strict Device Owner Mode -->
+        <!-- Device Admin Receiver for Strict Device Owner & Anti-Tamper Mode -->
         <receiver
             android:name=".security.deviceowner.AegisDeviceAdminReceiver"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
@@ -60,6 +67,18 @@
                 android:resource="@xml/device_admin_config" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Boot Receiver to Restore 10-Hour Device Lockdown After Reboot -->
+        <receiver
+            android:name=".services.protection.AegisBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

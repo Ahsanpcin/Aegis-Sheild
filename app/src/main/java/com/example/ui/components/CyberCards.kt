@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -29,10 +30,11 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisPrimaryCyan
-import com.example.ui.theme.AegisSecondaryBackground
+import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
+import com.example.ui.theme.ClassicalDisplayFont
 
 @Composable
 fun CyberCard(
@@ -44,15 +46,21 @@ fun CyberCard(
     val shape = RoundedCornerShape(16.dp)
     val cardModifier = modifier
         .fillMaxWidth()
+        .shadow(
+            elevation = 3.dp,
+            shape = shape,
+            ambientColor = AegisPrimaryCyan.copy(alpha = 0.08f),
+            spotColor = AegisPrimaryCyan.copy(alpha = 0.12f)
+        )
         .clip(shape)
         .background(
             brush = Brush.verticalGradient(
-                colors = listOf(AegisCardBackground, AegisSecondaryBackground)
+                colors = listOf(AegisCardBackground, AegisSurfaceElevated)
             )
         )
         .border(BorderStroke(1.dp, borderColor), shape)
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-        .padding(16.dp)
+        .padding(18.dp)
 
     Column(modifier = cardModifier, content = content)
 }
@@ -77,13 +85,13 @@ fun MetricTile(
                 color = AegisTextSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.sp
+                letterSpacing = 0.8.sp
             )
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(accentColor.copy(alpha = 0.15f)),
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(accentColor.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -99,7 +107,7 @@ fun MetricTile(
             color = AegisTextPrimary,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = ClassicalDisplayFont,
             modifier = Modifier.padding(top = 8.dp)
         )
         if (caption != null) {

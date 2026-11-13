@@ -1,29 +1,29 @@
 package com.example.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val AegisColorScheme = darkColorScheme(
+private val AegisColorScheme = lightColorScheme(
     primary = AegisPrimaryCyan,
-    onPrimary = AegisVoidBackground,
-    primaryContainer = AegisCardBackground,
+    onPrimary = AegisOnPrimaryWhite,
+    primaryContainer = AegisSecondaryBackground,
     onPrimaryContainer = AegisPrimaryCyan,
     secondary = AegisElectricBlue,
-    onSecondary = AegisTextPrimary,
-    secondaryContainer = AegisSecondaryBackground,
-    onSecondaryContainer = AegisPrimaryCyan,
+    onSecondary = AegisOnPrimaryWhite,
+    secondaryContainer = AegisSurfaceElevated,
+    onSecondaryContainer = AegisTextPrimary,
     tertiary = AegisPurple,
-    onTertiary = AegisTextPrimary,
+    onTertiary = AegisOnPrimaryWhite,
     background = AegisVoidBackground,
     onBackground = AegisTextPrimary,
-    surface = AegisSecondaryBackground,
+    surface = AegisCardBackground,
     onSurface = AegisTextPrimary,
-    surfaceVariant = AegisCardBackground,
+    surfaceVariant = AegisSecondaryBackground,
     onSurfaceVariant = AegisTextSecondary,
     outline = AegisCardBorder,
     error = AegisDangerRed,
-    onError = AegisTextPrimary
+    onError = AegisOnPrimaryWhite
 )
 
 @Composable

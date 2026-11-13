@@ -30,7 +30,9 @@ import com.example.blocking.overlay.SystemOverlayController
 import com.example.core.models.SecurityIncident
 import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
+import com.example.detection.classifier.ClassificationResult
 import com.example.detection.classifier.TFLiteContentClassifier
+import com.example.detection.decision.DecisionOutcome
 import com.example.detection.decision.ThreatDecisionEngine
 import com.example.detection.preprocessing.FramePreprocessor
 import com.example.di.AegisContainer
@@ -269,7 +271,7 @@ class AegisProtectionService : Service() {
             if (!isMaintenance) {
                 val decision = decisionEngine.evaluate(classification, sensitivity, isStrictEverything)
                 if (decision.shouldBlock) {
-                    handleThreatDetected(decision.category, decision.confidence, decision.reason)
+                    handleThreatDetected(classification, decision)
                 }
             }
         } catch (e: Exception) {
@@ -277,28 +279,53 @@ class AegisProtectionService : Service() {
         }
     }
 
-    private fun handleThreatDetected(category: ThreatCategory, confidence: Float, reason: String) {
+    private fun handleThreatDetected(classification: ClassificationResult, decision: DecisionOutcome) {
         val targetPkg = container.protectionRepository.telemetry.value.activeMonitoredPackage ?: "Active Application"
         val targetAppName = container.protectionRepository.activeAppLabel.value
+        val rawScores = if (classification.rawClassScores.isNotEmpty()) {
+            classification.rawClassScores.entries.joinToString(", ") { (k, v) -> "$k: ${(v * 100).toInt()}%" }
+        } else {
+            "Safe: ${(classification.safeScore * 100).toInt()}%, Suggestive: ${(classification.suggestiveScore * 100).toInt()}%, Explicit: ${(classification.explicitScore * 100).toInt()}%"
+        }
+        val fullDetails = "${decision.reason}\nModel Breakdown: $rawScores (Inference ${classification.latencyMs}ms)"
 
-        Log.w(TAG, "THREAT CONFIRMED: ${category.name} in $targetAppName ($targetPkg). Executing instant intervention.")
+        Log.w(TAG, "THREAT CONFIRMED: ${decision.category.name} in $targetAppName ($targetPkg). Executing eviction & full-device lockdown.")
 
-        overlayController.showBlockOverlay(category, targetAppName, targetPkg, reason)
-        AegisAccessibilityService.performEmergencyHomeAction()
-        AegisDeviceAdminReceiver.suspendPackageIfDeviceOwner(this, targetPkg)
+        // 1. Close offending app from foreground/background and prevent Recents re-entry
+        AegisAccessibilityService.closeAndEvictPackage(this, targetPkg)
+        val suspended = AegisDeviceAdminReceiver.suspendPackageIfDeviceOwner(this, targetPkg)
+
+        // 2. Engage persistent 10-hour full-device lockdown and tell everything that was detected
+        container.preferences.engageFullDeviceLockdown(
+            appName = targetAppName,
+            packageName = targetPkg,
+            categoryName = decision.category.displayName,
+            details = fullDetails
+        )
+        AegisLockdownService.start(this)
+        overlayController.showLockdownOverlay(container.preferences.lockdownIncidentInfo.value)
+
+        val hours = container.preferences.lockdownHours.value
+        val actionSummary = buildString {
+            append("App Evicted & Background Killed")
+            if (suspended) append(" + Package Suspended")
+            append(" • ${hours}h Device Lock")
+        }
 
         serviceScope.launch {
             val incident = SecurityIncident(
                 timestampMillis = System.currentTimeMillis(),
                 packageName = targetPkg,
                 appDisplayName = targetAppName,
-                category = category,
-                severity = ThreatSeverity.HIGH,
-                confidenceScore = confidence,
-                actionTaken = "Display Shielded & Home Invoked"
+                category = decision.category,
+                severity = decision.severity,
+                confidenceScore = decision.confidence,
+                actionTaken = actionSummary,
+                diagnosticSummary = fullDetails,
+                lockdownDurationMinutes = hours * 60
             )
             container.securityHistoryRepository.logIncident(incident)
-            container.protectionRepository.recordDetection(category)
+            container.protectionRepository.recordDetection(decision.category)
         }
     }
 

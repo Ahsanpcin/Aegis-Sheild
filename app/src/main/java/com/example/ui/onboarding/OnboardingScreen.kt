@@ -59,12 +59,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import com.example.core.permissions.PermissionHelper
+import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSuccessGreen
@@ -82,6 +85,7 @@ fun OnboardingScreen(
 
     var hasOverlay by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     var hasBatteryOpt by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
+    var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
 
     // Re-check permissions when returning from system settings
     DisposableEffect(lifecycleOwner) {
@@ -89,6 +93,7 @@ fun OnboardingScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasOverlay = PermissionHelper.hasOverlayPermission(context)
                 hasBatteryOpt = PermissionHelper.isIgnoringBatteryOptimizations(context)
+                isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -221,6 +226,25 @@ fun OnboardingScreen(
                 )
             }
 
+            // Permission 5: Device Administrator Anti-Tamper
+            item {
+                PermissionExplainerCard(
+                    title = "Device Administrator (Anti-Tamper)",
+                    icon = Icons.Default.AdminPanelSettings,
+                    accentColor = AegisDangerRed,
+                    isGranted = isDeviceAdmin,
+                    explanation = "Prevents unauthorized uninstalling or disabling of Aegis Shield. Deactivation is intercepted and gated by the Guardian Password.",
+                    actionLabel = if (isDeviceAdmin) "Device Admin Active" else "Activate Device Admin",
+                    onAction = {
+                        try {
+                            context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                        } catch (_: Exception) {
+                            context.startActivity(PermissionHelper.getAppDetailsSettingsIntent(context))
+                        }
+                    }
+                )
+            }
+
             // Limitations & Privacy Card
             item {
                 CyberCard(borderColor = AegisCardBorder) {
@@ -251,7 +275,7 @@ fun OnboardingScreen(
                         .testTag("onboarding_continue_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AegisPrimaryCyan,
-                        contentColor = AegisVoidBackground
+                        contentColor = AegisOnPrimaryWhite
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {

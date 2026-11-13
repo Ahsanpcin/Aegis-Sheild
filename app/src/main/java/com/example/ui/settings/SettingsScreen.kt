@@ -72,9 +72,11 @@ import com.example.detection.classifier.ModelManager
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.ModelManagerCard
+import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSecondaryBackground
@@ -100,16 +102,18 @@ fun SettingsScreen(
     val isAutoStart by preferences.autoStart.collectAsState()
     val hasPin by preferences.hasGuardianPin.collectAsState()
     val isMaintenanceMode by preferences.maintenanceMode.collectAsState()
+    val lockdownHours by preferences.lockdownHours.collectAsState()
+    val waitCooldownBeforePin by preferences.waitCooldownBeforePassword.collectAsState()
+    val antiTamperEnabled by preferences.antiTamperEnabled.collectAsState()
 
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
-    var isChangingPin by remember { mutableStateOf(false) }
 
     val hasOverlay = PermissionHelper.hasOverlayPermission(context)
     val hasBattery = PermissionHelper.isIgnoringBatteryOptimizations(context)
     val isDeviceOwner = remember(context) { AegisDeviceAdminReceiver.isDeviceOwner(context) }
-    val isDeviceAdmin = remember(context) { AegisDeviceAdminReceiver.isDeviceAdmin(context) }
+    var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
 
     Scaffold(
         topBar = {
@@ -173,8 +177,8 @@ fun SettingsScreen(
                                 showPinDialog = true
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (hasPin) AegisSecondaryBackground else AegisPrimaryCyan,
-                                contentColor = if (hasPin) AegisPrimaryCyan else AegisVoidBackground
+                                containerColor = if (hasPin) AegisCardBackground else AegisPrimaryCyan,
+                                contentColor = if (hasPin) AegisPrimaryCyan else AegisOnPrimaryWhite
                             ),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.border(1.dp, AegisPrimaryCyan.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
@@ -274,10 +278,10 @@ fun SettingsScreen(
                             checked = isStrictEverything,
                             onCheckedChange = { preferences.setStrictEverything(it) },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = AegisVoidBackground,
+                                checkedThumbColor = AegisOnPrimaryWhite,
                                 checkedTrackColor = AegisPrimaryCyan,
                                 uncheckedThumbColor = AegisTextMuted,
-                                uncheckedTrackColor = Color(0xFF1E293B)
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
                             )
                         )
                     }
@@ -309,10 +313,118 @@ fun SettingsScreen(
                             checked = isAutoStart,
                             onCheckedChange = { preferences.setAutoStart(it) },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = AegisVoidBackground,
+                                checkedThumbColor = AegisOnPrimaryWhite,
                                 checkedTrackColor = AegisPrimaryCyan,
                                 uncheckedThumbColor = AegisTextMuted,
-                                uncheckedTrackColor = Color(0xFF1E293B)
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
+                            )
+                        )
+                    }
+                }
+            }
+
+            // 10-Hour Whole-Device Lockdown & Anti-Tamper Enforcement
+            item {
+                CyberCard(borderColor = AegisDangerRed.copy(alpha = 0.35f)) {
+                    Text(
+                        text = "FULL-DEVICE LOCKDOWN & ANTI-TAMPER",
+                        color = AegisDangerRed,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Penalty Duration Before Password Unlock: $lockdownHours Hours",
+                        color = AegisTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(1, 4, 10, 24).forEach { hrs ->
+                            val selected = (lockdownHours == hrs)
+                            OutlinedButton(
+                                onClick = { preferences.setLockdownHours(hrs) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (selected) AegisPrimaryCyan else AegisCardBackground,
+                                    contentColor = if (selected) AegisOnPrimaryWhite else AegisTextSecondary
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                            ) {
+                                Text("${hrs}H", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "COOLDOWN BEFORE PASSWORD",
+                                color = AegisTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Lock the entire mobile for the full ${lockdownHours}h countdown before allowing Guardian Password entry.",
+                                color = AegisTextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = waitCooldownBeforePin,
+                            onCheckedChange = { preferences.setWaitCooldownBeforePassword(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = AegisOnPrimaryWhite,
+                                checkedTrackColor = AegisPrimaryCyan,
+                                uncheckedThumbColor = AegisTextMuted,
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "SETTINGS & ADMIN ANTI-TAMPER",
+                                color = AegisTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Require Guardian Password before disabling Device Admin, Accessibility, Uninstall, or Date & Time.",
+                                color = AegisTextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = antiTamperEnabled,
+                            onCheckedChange = { preferences.setAntiTamperEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = AegisOnPrimaryWhite,
+                                checkedTrackColor = AegisPrimaryCyan,
+                                uncheckedThumbColor = AegisTextMuted,
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
                             )
                         )
                     }
@@ -354,6 +466,25 @@ fun SettingsScreen(
                         lineHeight = 17.sp
                     )
 
+                    if (!isDeviceAdmin) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                preferences.grantTemporarySettingsAuthorization(2)
+                                context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                                isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AegisPrimaryCyan,
+                                contentColor = AegisOnPrimaryWhite
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Text("ACTIVATE DEVICE ADMINISTRATOR", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+
                     if (!isDeviceOwner) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -386,12 +517,26 @@ fun SettingsScreen(
                     PermissionHealthRow(
                         label = "System Overlay Permission",
                         isHealthy = hasOverlay,
-                        onFix = { context.startActivity(PermissionHelper.getOverlaySettingsIntent(context)) }
+                        onFix = {
+                            preferences.grantTemporarySettingsAuthorization(2)
+                            context.startActivity(PermissionHelper.getOverlaySettingsIntent(context))
+                        }
+                    )
+                    PermissionHealthRow(
+                        label = "Device Administrator Protection",
+                        isHealthy = isDeviceAdmin,
+                        onFix = {
+                            preferences.grantTemporarySettingsAuthorization(2)
+                            context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                        }
                     )
                     PermissionHealthRow(
                         label = "Battery Optimization Exemption",
                         isHealthy = hasBattery,
-                        onFix = { context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context)) }
+                        onFix = {
+                            preferences.grantTemporarySettingsAuthorization(2)
+                            context.startActivity(PermissionHelper.getBatteryOptimizationSettingsIntent(context))
+                        }
                     )
                 }
             }
@@ -430,10 +575,10 @@ fun SettingsScreen(
                                 }
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = AegisVoidBackground,
+                                checkedThumbColor = AegisOnPrimaryWhite,
                                 checkedTrackColor = AegisDangerRed,
                                 uncheckedThumbColor = AegisTextMuted,
-                                uncheckedTrackColor = Color(0xFF1E293B)
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
                             )
                         )
                     }
@@ -470,7 +615,7 @@ fun SettingsScreen(
         if (showPinDialog) {
             AlertDialog(
                 onDismissRequest = { showPinDialog = false },
-                containerColor = AegisSecondaryBackground,
+                containerColor = AegisCardBackground,
                 titleContentColor = AegisTextPrimary,
                 title = { Text(text = if (hasPin) "Change Guardian PIN" else "Set Guardian PIN") },
                 text = {
@@ -516,7 +661,7 @@ fun SettingsScreen(
                                 showPinDialog = false
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisVoidBackground)
+                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)
                     ) {
                         Text(text = "SAVE PIN", fontWeight = FontWeight.Bold)
                     }

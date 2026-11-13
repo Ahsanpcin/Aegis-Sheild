@@ -6,13 +6,31 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.UserManager
 import android.util.Log
+import com.example.blocking.overlay.SystemOverlayController
+import com.example.di.AegisContainer
+import com.example.monitoring.accessibility.AegisAccessibilityService
 
 class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
 
     override fun onEnabled(context: Context, intent: Intent) {
         super.onEnabled(context, intent)
         Log.i(TAG, "Aegis Shield Device Administrator privilege enabled.")
+        applyDeviceOwnerHardeningIfEligible(context)
+    }
+
+    override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
+        val prefs = AegisContainer.getInstance(context).preferences
+        val authorized = prefs.isGuardianAuthorizedForSystemSettings() && !prefs.isLockdownActive()
+        if (!authorized) {
+            Log.w(TAG, "Unauthorized attempt to disable Aegis Device Administrator blocked.")
+            AegisAccessibilityService.performEmergencyHomeAction()
+            SystemOverlayController(context.applicationContext).showTamperLockOverlay(
+                reason = "Unauthorized attempt to deactivate Device Administrator was intercepted. Guardian Password is required."
+            )
+        }
+        return "AEGIS SHIELD ANTI-TAMPER PROTECTION: Guardian Password verification is required before Device Administrator can be deactivated."
     }
 
     override fun onDisabled(context: Context, intent: Intent) {
@@ -27,6 +45,16 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
             return ComponentName(context.applicationContext, AegisDeviceAdminReceiver::class.java)
         }
 
+        fun createActivateAdminIntent(context: Context): Intent {
+            return Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, getComponentName(context))
+                putExtra(
+                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "Activates anti-tamper protection and requires Guardian Password before Aegis Shield administration can be disabled or uninstalled."
+                )
+            }
+        }
+
         fun isDeviceOwner(context: Context): Boolean {
             val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
                 ?: return false
@@ -37,6 +65,19 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
             val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
                 ?: return false
             return dpm.isAdminActive(getComponentName(context))
+        }
+
+        fun applyDeviceOwnerHardeningIfEligible(context: Context) {
+            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
+            if (!dpm.isDeviceOwnerApp(context.packageName)) return
+            val admin = getComponentName(context)
+            try {
+                dpm.setUninstallBlocked(admin, context.packageName, true)
+                dpm.addUserRestriction(admin, UserManager.DISALLOW_SAFE_BOOT)
+                Log.i(TAG, "Applied Device Owner uninstall lock and Safe Boot restriction.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error applying Device Owner policies", e)
+            }
         }
 
         /**
@@ -53,7 +94,6 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
                 return false
             }
 
-            // Never suspend critical system packages or our own app
             if (packageName == context.packageName ||
                 packageName == "android" ||
                 packageName == "com.android.systemui" ||
@@ -66,7 +106,7 @@ class AegisDeviceAdminReceiver : DeviceAdminReceiver() {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 try {
                     val result = dpm.setPackagesSuspended(getComponentName(context), arrayOf(packageName), true)
-                    val suspended = result != null && result.isEmpty() // Empty array means 0 failures
+                    val suspended = result != null && result.isEmpty()
                     Log.i(TAG, "Suspended package $packageName: $suspended")
                     suspended
                 } catch (e: Exception) {

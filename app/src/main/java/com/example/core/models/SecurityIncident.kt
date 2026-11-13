@@ -9,5 +9,7 @@ data class SecurityIncident(
     val severity: ThreatSeverity,
     val confidenceScore: Float,
     val actionTaken: String,
+    val diagnosticSummary: String = "",
+    val lockdownDurationMinutes: Int = 0,
     val isReviewedFalsePositive: Boolean = false
 )

@@ -61,6 +61,7 @@ import com.example.detection.classifier.SampleTestResult
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
+import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSecondaryBackground
@@ -230,7 +231,7 @@ fun ModelManagerCard(
                 enabled = !isImporting,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AegisPrimaryCyan,
-                    contentColor = AegisVoidBackground
+                    contentColor = AegisOnPrimaryWhite
                 ),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
@@ -241,7 +242,7 @@ fun ModelManagerCard(
                 if (isImporting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = AegisVoidBackground,
+                        color = AegisOnPrimaryWhite,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(8.dp))

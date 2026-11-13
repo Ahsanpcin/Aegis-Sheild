@@ -17,6 +17,8 @@ data class IncidentEntity(
     val severity: String,
     val confidenceScore: Float,
     val actionTaken: String,
+    val diagnosticSummary: String = "",
+    val lockdownDurationMinutes: Int = 0,
     val isReviewedFalsePositive: Boolean = false
 ) {
     fun toDomain(): SecurityIncident {
@@ -39,6 +41,8 @@ data class IncidentEntity(
             severity = sev,
             confidenceScore = confidenceScore,
             actionTaken = actionTaken,
+            diagnosticSummary = diagnosticSummary,
+            lockdownDurationMinutes = lockdownDurationMinutes,
             isReviewedFalsePositive = isReviewedFalsePositive
         )
     }
@@ -54,6 +58,8 @@ data class IncidentEntity(
                 severity = incident.severity.name,
                 confidenceScore = incident.confidenceScore,
                 actionTaken = incident.actionTaken,
+                diagnosticSummary = incident.diagnosticSummary,
+                lockdownDurationMinutes = incident.lockdownDurationMinutes,
                 isReviewedFalsePositive = incident.isReviewedFalsePositive
             )
         }
