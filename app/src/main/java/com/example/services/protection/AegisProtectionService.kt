@@ -260,6 +260,13 @@ class AegisProtectionService : Service() {
                 return
             }
 
+            // Bypass if active application is whitelisted by user
+            val activePkg = container.protectionRepository.telemetry.value.activeMonitoredPackage
+            if (!activePkg.isNullOrBlank() && container.preferences.isPackageWhitelisted(activePkg)) {
+                bitmap.recycle()
+                return
+            }
+
             // Do not attempt inference or fake results when no TFLite model is loaded
             if (!contentClassifier.isModelReady) {
                 bitmap.recycle()

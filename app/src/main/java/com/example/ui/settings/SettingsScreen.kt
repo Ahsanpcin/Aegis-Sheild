@@ -1,7 +1,9 @@
 package com.example.ui.settings
 
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -277,6 +279,11 @@ fun SettingsScreen(
                             testTag = "power_opt_pause_screen_off"
                         )
                     }
+                }
+
+                // App Whitelisting & Exclusion Rules
+                item {
+                    WhitelistedAppsSection(preferences = preferences)
                 }
 
                 // 2. PIN Change of Guardian
@@ -951,6 +958,143 @@ private fun PowerOptionSwitchRow(
                 uncheckedThumbColor = AegisTextMuted,
                 uncheckedTrackColor = AegisCardBorder
             )
+        )
+    }
+}
+
+@Composable
+fun WhitelistedAppsSection(preferences: AegisPreferences) {
+    val whitelisted by preferences.whitelistedPackages.collectAsState()
+    var showAddDialog by remember { mutableStateOf(false) }
+    var packageInput by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    LuxurySectionHeader(title = "App Whitelisting & Exclusion Rules", accentColor = AegisPrimaryCyan)
+    Spacer(modifier = Modifier.height(8.dp))
+    CyberCard(
+        borderColor = AegisLavenderBorder,
+        tone = CyberCardTone.SKY,
+        modifier = Modifier.testTag("whitelisted_apps_card")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Excluded Apps (${whitelisted.size})",
+                    color = AegisTextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalDisplayFont
+                )
+                Text(
+                    text = "Bypass AI screen guard & blocking for trusted apps",
+                    color = AegisTextSecondary,
+                    fontSize = 12.sp,
+                    fontFamily = ClassicalBodyFont
+                )
+            }
+            Button(
+                onClick = {
+                    packageInput = ""
+                    showAddDialog = true
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.testTag("add_whitelist_button")
+            ) {
+                Text("ADD APP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (whitelisted.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                whitelisted.forEach { pkg ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(AegisSurfaceElevated, RoundedCornerShape(10.dp))
+                            .border(1.dp, AegisLavenderBorder, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = pkg,
+                            color = AegisTextPrimary,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                preferences.removeWhitelistedPackage(pkg)
+                                Toast.makeText(context, "Removed $pkg from whitelist", Toast.LENGTH_SHORT).show()
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Remove", fontSize = 10.sp, color = AegisWarningAmber)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            containerColor = AegisLavenderSoft,
+            title = { Text("Whitelist App Package", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Enter the exact package name to exclude from scanning (e.g. com.whatsapp, com.google.android.youtube):", fontSize = 12.sp, fontFamily = ClassicalBodyFont)
+                    OutlinedTextField(
+                        value = packageInput,
+                        onValueChange = { packageInput = it },
+                        label = { Text("Package Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Quick suggestions:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AegisPurple)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("com.whatsapp", "com.google.android.youtube", "com.android.chrome", "com.google.android.gm").forEach { suggestion ->
+                            OutlinedButton(
+                                onClick = { packageInput = suggestion },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(suggestion.substringAfterLast('.'), fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (packageInput.isNotBlank()) {
+                            preferences.addWhitelistedPackage(packageInput.trim())
+                            Toast.makeText(context, "Whitelisted ${packageInput.trim()}", Toast.LENGTH_SHORT).show()
+                            showAddDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
+                ) {
+                    Text("ADD TO WHITELIST", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showAddDialog = false }) {
+                    Text("CANCEL")
+                }
+            }
         )
     }
 }

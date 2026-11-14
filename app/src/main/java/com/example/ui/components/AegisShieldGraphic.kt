@@ -44,11 +44,14 @@ import com.example.ui.theme.AegisElectricBlue
 import com.example.ui.theme.AegisMintSoft
 import com.example.ui.theme.AegisOpticalTeal
 import com.example.ui.theme.AegisPrimaryCyan
+import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisRedGlow
 import com.example.ui.theme.AegisSecondaryBackground
 import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisTextMuted
 import kotlinx.coroutines.launch
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun AegisShieldGraphic(
@@ -59,10 +62,10 @@ fun AegisShieldGraphic(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "SheildlenzCrestMotion")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.50f,
+        initialValue = 0.45f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "PulseAlpha"
@@ -72,7 +75,7 @@ fun AegisShieldGraphic(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 16000, easing = LinearEasing),
+            animation = tween(durationMillis = 12000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ApertureRotation"
@@ -95,9 +98,9 @@ fun AegisShieldGraphic(
         if (prev != null && prev != isProtected) {
             waveDirection = if (isProtected) 1 else -1
             launch {
-                crestScale.snapTo(if (isProtected) 0.88f else 1.06f)
+                crestScale.snapTo(if (isProtected) 0.85f else 1.08f)
                 crestScale.animateTo(
-                    targetValue = if (isProtected) 1.08f else 0.94f,
+                    targetValue = if (isProtected) 1.12f else 0.92f,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessMedium
@@ -191,14 +194,14 @@ fun AegisShieldGraphic(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            glowColor.copy(alpha = glowColor.alpha * 1.4f * pulseAlpha * activationProgress),
-                            AegisChampagneGold.copy(alpha = 0.07f * pulseAlpha * activationProgress),
+                            glowColor.copy(alpha = glowColor.alpha * 1.5f * pulseAlpha * activationProgress),
+                            AegisChampagneGold.copy(alpha = 0.09f * pulseAlpha * activationProgress),
                             Color.Transparent
                         ),
                         center = center,
-                        radius = width * (0.42f + 0.14f * activationProgress)
+                        radius = width * (0.44f + 0.16f * activationProgress)
                     ),
-                    radius = width * (0.42f + 0.14f * activationProgress),
+                    radius = width * (0.44f + 0.16f * activationProgress),
                     center = center
                 )
             }
@@ -207,28 +210,44 @@ fun AegisShieldGraphic(
             if (waveDirection != 0 && waveProgress.value in 0.01f..0.99f) {
                 val p = waveProgress.value
                 val waveRadius = if (waveDirection > 0) {
-                    width * (0.20f + 0.36f * p)
+                    width * (0.18f + 0.40f * p)
                 } else {
-                    width * (0.50f - 0.30f * p)
+                    width * (0.52f - 0.32f * p)
                 }
-                val waveAlpha = (1f - p) * 0.65f
-                val waveColor = if (waveDirection > 0) AegisPrimaryCyan else AegisTextMuted
+                val waveAlpha = (1f - p) * 0.70f
+                val waveColor = if (waveDirection > 0) AegisPrimaryCyan else AegisChampagneGold
                 drawCircle(
                     color = waveColor.copy(alpha = waveAlpha),
                     radius = waveRadius,
                     center = center,
-                    style = Stroke(width = (3.dp.toPx() * (1f - p * 0.5f)))
+                    style = Stroke(width = (3.5.dp.toPx() * (1f - p * 0.5f)))
                 )
             }
 
-            // Soft concentric orbital hairline ring
+            // Soft concentric orbital hairline rings
             drawCircle(
                 color = (if (isThreatActive) AegisDangerRed else AegisChampagneGold)
-                    .copy(alpha = 0.12f + (0.16f * pulseAlpha * activationProgress)),
-                radius = width * (0.45f + 0.03f * activationProgress),
+                    .copy(alpha = 0.14f + (0.18f * pulseAlpha * activationProgress)),
+                radius = width * (0.46f + 0.03f * activationProgress),
                 center = center,
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 1.2.dp.toPx())
             )
+
+            // Orbiting active energy spark dots
+            if (activationProgress > 0.1f) {
+                val sparkRadius = width * 0.46f
+                for (i in 0 until 3) {
+                    val angleDeg = apertureAngle + i * 120f
+                    val angleRad = Math.toRadians(angleDeg.toDouble())
+                    val sparkX = center.x + (sparkRadius * cos(angleRad)).toFloat()
+                    val sparkY = center.y + (sparkRadius * sin(angleRad)).toFloat()
+                    drawCircle(
+                        color = (if (i % 2 == 0) AegisPrimaryCyan else AegisPurple).copy(alpha = 0.85f * activationProgress),
+                        radius = 3.dp.toPx(),
+                        center = Offset(sparkX, sparkY)
+                    )
+                }
+            }
 
             // Heraldic Sheildlenz Crest Geometry
             val shieldPath = Path().apply {
@@ -256,14 +275,14 @@ fun AegisShieldGraphic(
                 close()
             }
 
-            // Luminous Sky-Lavender Satin Shield Interior (no plain white fill)
+            // Luminous Sky-Lavender Satin Shield Interior
             drawPath(
                 path = shieldPath,
                 brush = Brush.verticalGradient(
                     colors = if (isThreatActive) {
                         listOf(AegisChampagneSoft, Color(0xFFFFDE99))
                     } else if (isProtected) {
-                        listOf(Color(0xFFDCEBFF), Color(0xFFE3D8FF))
+                        listOf(Color(0xFFDCEBFF), Color(0xFFE5D8FF))
                     } else {
                         listOf(Color(0xFFE8F2FF), AegisSecondaryBackground)
                     }
@@ -312,7 +331,7 @@ fun AegisShieldGraphic(
                         rimSecondaryColor
                     )
                 ),
-                style = Stroke(width = 3.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
 
             // Center Optical Lens Housing (Sheildlenz signature motif)
@@ -349,13 +368,13 @@ fun AegisShieldGraphic(
             rotate(degrees = apertureAngle * activationProgress, pivot = lensCenter) {
                 for (i in 0 until 4) {
                     drawArc(
-                        color = lensAccent.copy(alpha = 0.45f + 0.42f * activationProgress),
+                        color = lensAccent.copy(alpha = 0.45f + 0.45f * activationProgress),
                         startAngle = i * 90f + 10f,
-                        sweepAngle = 32f + 26f * activationProgress,
+                        sweepAngle = 32f + 28f * activationProgress,
                         useCenter = false,
                         topLeft = arcTopLeft,
                         size = arcSize,
-                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                        style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
                     )
                 }
             }

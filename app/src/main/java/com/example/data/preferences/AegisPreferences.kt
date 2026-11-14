@@ -136,6 +136,36 @@ class AegisPreferences(context: Context) {
     private val _pauseWhenScreenOff = MutableStateFlow(prefs.getBoolean(KEY_PAUSE_WHEN_SCREEN_OFF, true))
     val pauseWhenScreenOff: StateFlow<Boolean> = _pauseWhenScreenOff.asStateFlow()
 
+    private val _whitelistedPackages = MutableStateFlow(
+        prefs.getStringSet(KEY_WHITELISTED_PACKAGES, emptySet()) ?: emptySet()
+    )
+    val whitelistedPackages: StateFlow<Set<String>> = _whitelistedPackages.asStateFlow()
+
+    fun setWhitelistedPackages(packages: Set<String>) {
+        prefs.edit().putStringSet(KEY_WHITELISTED_PACKAGES, packages).apply()
+        _whitelistedPackages.value = packages
+    }
+
+    fun addWhitelistedPackage(packageName: String) {
+        if (packageName.isBlank()) return
+        val current = _whitelistedPackages.value.toMutableSet()
+        if (current.add(packageName.trim())) {
+            setWhitelistedPackages(current)
+        }
+    }
+
+    fun removeWhitelistedPackage(packageName: String) {
+        val current = _whitelistedPackages.value.toMutableSet()
+        if (current.remove(packageName)) {
+            setWhitelistedPackages(current)
+        }
+    }
+
+    fun isPackageWhitelisted(packageName: String): Boolean {
+        if (packageName.isBlank()) return false
+        return _whitelistedPackages.value.contains(packageName)
+    }
+
     private val _customThresholdsEnabled = MutableStateFlow(prefs.getBoolean(KEY_CUSTOM_THRESHOLDS_ENABLED, false))
     val customThresholdsEnabled: StateFlow<Boolean> = _customThresholdsEnabled.asStateFlow()
 
@@ -634,5 +664,6 @@ class AegisPreferences(context: Context) {
         private const val KEY_SHOW_EMERGENCY_DIALER = "key_show_emergency_dialer"
         private const val KEY_EVICT_APP_ON_THREAT = "key_evict_app_on_threat"
         private const val KEY_GUARDIAN_WINDOW_MINUTES = "key_guardian_window_minutes"
+        private const val KEY_WHITELISTED_PACKAGES = "key_whitelisted_packages"
     }
 }

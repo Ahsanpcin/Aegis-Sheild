@@ -728,4 +728,30 @@ class ExampleRobolectricTest {
         assertTrue(prefs.skipDuplicateFrames.value)
         assertTrue(prefs.pauseWhenScreenOff.value)
     }
+
+    @Test
+    fun `whitelisted packages add and remove rules correctly`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+
+        // Clear first
+        prefs.setWhitelistedPackages(emptySet())
+        assertTrue(prefs.whitelistedPackages.value.isEmpty())
+
+        prefs.addWhitelistedPackage("com.whatsapp")
+        assertTrue(prefs.isPackageWhitelisted("com.whatsapp"))
+        assertTrue(prefs.whitelistedPackages.value.contains("com.whatsapp"))
+
+        prefs.addWhitelistedPackage("com.google.android.youtube")
+        assertTrue(prefs.isPackageWhitelisted("com.google.android.youtube"))
+        assertEquals(2, prefs.whitelistedPackages.value.size)
+
+        prefs.removeWhitelistedPackage("com.whatsapp")
+        assertFalse(prefs.isPackageWhitelisted("com.whatsapp"))
+        assertTrue(prefs.isPackageWhitelisted("com.google.android.youtube"))
+        assertEquals(1, prefs.whitelistedPackages.value.size)
+
+        prefs.setWhitelistedPackages(emptySet())
+        assertFalse(prefs.isPackageWhitelisted("com.google.android.youtube"))
+    }
 }
