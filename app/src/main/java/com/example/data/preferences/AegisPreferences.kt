@@ -18,6 +18,40 @@ data class LockdownIncidentInfo(
     val detectedAtMillis: Long = 0L
 )
 
+enum class PowerMode(
+    val displayName: String,
+    val caption: String,
+    val scanIntervalMs: Int,
+    val captureWidthPx: Int,
+    val skipDuplicates: Boolean,
+    val pauseOnScreenOff: Boolean
+) {
+    POWER_SAVING(
+        displayName = "Power Saving",
+        caption = "650ms • Low Battery",
+        scanIntervalMs = 650,
+        captureWidthPx = 320,
+        skipDuplicates = true,
+        pauseOnScreenOff = true
+    ),
+    BALANCED(
+        displayName = "Balanced",
+        caption = "300ms • Daily Guard",
+        scanIntervalMs = 300,
+        captureWidthPx = 480,
+        skipDuplicates = true,
+        pauseOnScreenOff = true
+    ),
+    EXTREME(
+        displayName = "Extreme",
+        caption = "120ms • Max Speed",
+        scanIntervalMs = 120,
+        captureWidthPx = 640,
+        skipDuplicates = false,
+        pauseOnScreenOff = false
+    )
+}
+
 class AegisPreferences(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("aegis_shield_prefs", Context.MODE_PRIVATE)
 
@@ -87,6 +121,9 @@ class AegisPreferences(context: Context) {
     private val _doubleTimeMultiplier = MutableStateFlow(prefs.getFloat(KEY_DOUBLE_TIME_MULTIPLIER, 2.0f))
     val doubleTimeMultiplier: StateFlow<Float> = _doubleTimeMultiplier.asStateFlow()
 
+    private val _powerMode = MutableStateFlow(getSavedPowerMode())
+    val powerMode: StateFlow<PowerMode> = _powerMode.asStateFlow()
+
     private val _scanIntervalMs = MutableStateFlow(prefs.getInt(KEY_SCAN_INTERVAL_MS, 300).coerceIn(100, 2000))
     val scanIntervalMs: StateFlow<Int> = _scanIntervalMs.asStateFlow()
 
@@ -95,6 +132,9 @@ class AegisPreferences(context: Context) {
 
     private val _skipDuplicateFrames = MutableStateFlow(prefs.getBoolean(KEY_SKIP_DUPLICATE_FRAMES, true))
     val skipDuplicateFrames: StateFlow<Boolean> = _skipDuplicateFrames.asStateFlow()
+
+    private val _pauseWhenScreenOff = MutableStateFlow(prefs.getBoolean(KEY_PAUSE_WHEN_SCREEN_OFF, true))
+    val pauseWhenScreenOff: StateFlow<Boolean> = _pauseWhenScreenOff.asStateFlow()
 
     private val _customThresholdsEnabled = MutableStateFlow(prefs.getBoolean(KEY_CUSTOM_THRESHOLDS_ENABLED, false))
     val customThresholdsEnabled: StateFlow<Boolean> = _customThresholdsEnabled.asStateFlow()
@@ -136,6 +176,15 @@ class AegisPreferences(context: Context) {
             SensitivityLevel.valueOf(name ?: SensitivityLevel.BALANCED.name)
         } catch (_: Exception) {
             SensitivityLevel.BALANCED
+        }
+    }
+
+    private fun getSavedPowerMode(): PowerMode {
+        val name = prefs.getString(KEY_POWER_MODE, PowerMode.BALANCED.name)
+        return try {
+            PowerMode.valueOf(name ?: PowerMode.BALANCED.name)
+        } catch (_: Exception) {
+            PowerMode.BALANCED
         }
     }
 
@@ -226,6 +275,21 @@ class AegisPreferences(context: Context) {
         _doubleTimeMultiplier.value = clamped
     }
 
+    fun setPowerMode(mode: PowerMode) {
+        prefs.edit()
+            .putString(KEY_POWER_MODE, mode.name)
+            .putInt(KEY_SCAN_INTERVAL_MS, mode.scanIntervalMs)
+            .putInt(KEY_CAPTURE_WIDTH_PX, mode.captureWidthPx)
+            .putBoolean(KEY_SKIP_DUPLICATE_FRAMES, mode.skipDuplicates)
+            .putBoolean(KEY_PAUSE_WHEN_SCREEN_OFF, mode.pauseOnScreenOff)
+            .apply()
+        _powerMode.value = mode
+        _scanIntervalMs.value = mode.scanIntervalMs
+        _captureWidthPx.value = mode.captureWidthPx
+        _skipDuplicateFrames.value = mode.skipDuplicates
+        _pauseWhenScreenOff.value = mode.pauseOnScreenOff
+    }
+
     fun setScanIntervalMs(intervalMs: Int) {
         val clamped = intervalMs.coerceIn(100, 2000)
         prefs.edit().putInt(KEY_SCAN_INTERVAL_MS, clamped).apply()
@@ -241,6 +305,16 @@ class AegisPreferences(context: Context) {
     fun setSkipDuplicateFrames(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_SKIP_DUPLICATE_FRAMES, enabled).apply()
         _skipDuplicateFrames.value = enabled
+    }
+
+    fun setPauseWhenScreenOff(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PAUSE_WHEN_SCREEN_OFF, enabled).apply()
+        _pauseWhenScreenOff.value = enabled
+    }
+
+    fun setCompactPowerResolution(enabled: Boolean) {
+        val targetWidth = if (enabled) 320 else PowerMode.BALANCED.captureWidthPx
+        setCaptureWidthPx(targetWidth)
     }
 
     fun setCustomThresholdsEnabled(enabled: Boolean) {
@@ -285,9 +359,7 @@ class AegisPreferences(context: Context) {
     fun resetAdvancedCustomizations() {
         setLockdownHours(DEFAULT_LOCKDOWN_HOURS)
         setDoubleTimeMultiplier(2.0f)
-        setScanIntervalMs(300)
-        setCaptureWidthPx(480)
-        setSkipDuplicateFrames(true)
+        setPowerMode(PowerMode.BALANCED)
         setCustomThresholdsEnabled(false)
         setCustomExplicitThreshold(0.75f)
         setCustomSuggestiveThreshold(0.80f)
@@ -550,9 +622,11 @@ class AegisPreferences(context: Context) {
 
         private const val KEY_ADVANCED_UNLOCKED = "key_advanced_lab_unlocked"
         private const val KEY_DOUBLE_TIME_MULTIPLIER = "key_double_time_multiplier"
+        private const val KEY_POWER_MODE = "key_power_mode"
         private const val KEY_SCAN_INTERVAL_MS = "key_scan_interval_ms"
         private const val KEY_CAPTURE_WIDTH_PX = "key_capture_width_px"
         private const val KEY_SKIP_DUPLICATE_FRAMES = "key_skip_duplicate_frames"
+        private const val KEY_PAUSE_WHEN_SCREEN_OFF = "key_pause_when_screen_off"
         private const val KEY_CUSTOM_THRESHOLDS_ENABLED = "key_custom_thresholds_enabled"
         private const val KEY_CUSTOM_EXPLICIT_THRESHOLD = "key_custom_explicit_threshold"
         private const val KEY_CUSTOM_SUGGESTIVE_THRESHOLD = "key_custom_suggestive_threshold"

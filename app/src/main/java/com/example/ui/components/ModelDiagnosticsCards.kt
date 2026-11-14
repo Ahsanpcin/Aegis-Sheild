@@ -265,8 +265,12 @@ fun ModelManagerCard(
         ) {
             Button(
                 onClick = {
-                    val label = if (telemetry.isModelLoaded) "replace AI model" else "load AI model"
-                    onRequireAuth(label) {
+                    if (telemetry.isModelLoaded) {
+                        onRequireAuth("replace AI model") {
+                            onBeforeOpenPicker()
+                            modelPickerLauncher.launch(arrayOf("*/*"))
+                        }
+                    } else {
                         onBeforeOpenPicker()
                         modelPickerLauncher.launch(arrayOf("*/*"))
                     }

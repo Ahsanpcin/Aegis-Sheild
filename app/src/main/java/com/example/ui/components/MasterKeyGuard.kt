@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Key
@@ -32,8 +33,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -120,6 +127,14 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
         var keyInput by remember(actionLabel) { mutableStateOf("") }
         var keyError by remember(actionLabel) { mutableStateOf<String?>(null) }
 
+        val submitAction: () -> Unit = {
+            val err = state.submitKey(keyInput)
+            if (err != null) {
+                keyError = err
+                keyInput = ""
+            }
+        }
+
         AlertDialog(
             onDismissRequest = { state.dismiss() },
             containerColor = AegisLavenderSoft,
@@ -175,7 +190,11 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
                         },
                         label = { Text("Master Key (4–8 digits)", fontFamily = ClassicalBodyFont) },
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.NumberPassword,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { submitAction() }),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         isError = keyError != null,
@@ -189,6 +208,16 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .onPreviewKeyEvent { event ->
+                                if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                                    if (event.type == KeyEventType.KeyDown) {
+                                        submitAction()
+                                    }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                             .testTag("master_key_prompt_input")
                     )
                     if (keyError != null) {
@@ -205,13 +234,7 @@ fun rememberMasterKeyGate(preferences: AegisPreferences): MasterKeyGateState {
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        val err = state.submitKey(keyInput)
-                        if (err != null) {
-                            keyError = err
-                            keyInput = ""
-                        }
-                    },
+                    onClick = submitAction,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AegisPurple,
                         contentColor = AegisOnPrimaryWhite

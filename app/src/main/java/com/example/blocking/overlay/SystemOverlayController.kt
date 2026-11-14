@@ -12,8 +12,10 @@ import android.os.Looper
 import android.text.InputType
 import android.util.Log
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -358,6 +360,8 @@ class SystemOverlayController(private val context: Context) {
             setHintTextColor(Color.parseColor("#5D76B0"))
             setTextColor(Color.parseColor("#1A3673"))
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            isSingleLine = true
             typeface = Typeface.MONOSPACE
             textSize = 14f
             gravity = Gravity.CENTER
@@ -411,6 +415,7 @@ class SystemOverlayController(private val context: Context) {
                 }
             }
         }
+        bindPinSubmitOnEnter(pinField, unlockBtn)
         unlockButtonView = unlockBtn
         pinCard.addView(unlockBtn)
 
@@ -535,6 +540,8 @@ class SystemOverlayController(private val context: Context) {
             setHintTextColor(Color.parseColor("#5D76B0"))
             setTextColor(Color.parseColor("#1A3673"))
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            isSingleLine = true
             typeface = Typeface.MONOSPACE
             textSize = 14f
             gravity = Gravity.CENTER
@@ -574,6 +581,7 @@ class SystemOverlayController(private val context: Context) {
                 }
             }
         }
+        bindPinSubmitOnEnter(pinField, verifyBtn)
         root.addView(verifyBtn)
 
         root.addView(verticalSpacer(14))
@@ -729,6 +737,37 @@ class SystemOverlayController(private val context: Context) {
         val minutes = (totalSeconds % 3600L) / 60L
         val seconds = totalSeconds % 60L
         return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private fun bindPinSubmitOnEnter(pinField: EditText, submitButton: Button) {
+        pinField.setOnEditorActionListener { _, actionId, event ->
+            val isDoneAction = actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_GO ||
+                actionId == EditorInfo.IME_ACTION_SEND
+            val isEnterKey = event != null &&
+                (event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) &&
+                event.action == KeyEvent.ACTION_DOWN
+            if (isDoneAction || isEnterKey) {
+                if (submitButton.isEnabled) {
+                    submitButton.performClick()
+                }
+                true
+            } else {
+                false
+            }
+        }
+        pinField.setOnKeyListener { _, keyCode, event ->
+            if ((keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) &&
+                event.action == KeyEvent.ACTION_DOWN
+            ) {
+                if (submitButton.isEnabled) {
+                    submitButton.performClick()
+                }
+                true
+            } else {
+                false
+            }
+        }
     }
 
     private fun verticalSpacer(heightPx: Int): View {

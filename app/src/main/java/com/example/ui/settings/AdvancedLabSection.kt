@@ -582,9 +582,7 @@ fun AdvancedPrecisionLabSection(
                     subtitle = "Save battery on unchanged screens",
                     checked = skipDuplicateFrames,
                     onCheckedChange = { enabled ->
-                        masterKeyGate.request("${if (enabled) "enable" else "disable"} duplicate frame skipping") {
-                            preferences.setSkipDuplicateFrames(enabled)
-                        }
+                        preferences.setSkipDuplicateFrames(enabled)
                     }
                 )
             }
@@ -627,12 +625,7 @@ fun AdvancedPrecisionLabSection(
                     onValueChangeFinished = {
                         val snapped = draftScanInterval
                         if (snapped != scanIntervalMs) {
-                            masterKeyGate.request(
-                                actionLabel = "set scan interval to ${snapped}ms",
-                                onCancel = { draftScanInterval = scanIntervalMs }
-                            ) {
-                                preferences.setScanIntervalMs(snapped)
-                            }
+                            preferences.setScanIntervalMs(snapped)
                         }
                     },
                     valueRange = 100f..2000f,
@@ -661,9 +654,7 @@ fun AdvancedPrecisionLabSection(
                             selected = selected,
                             onClick = {
                                 if (!selected) {
-                                    masterKeyGate.request("set capture width to ${w}px") {
-                                        preferences.setCaptureWidthPx(w)
-                                    }
+                                    preferences.setCaptureWidthPx(w)
                                 }
                             },
                             modifier = Modifier.weight(1f)

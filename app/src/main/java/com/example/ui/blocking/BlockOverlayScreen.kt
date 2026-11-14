@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,10 +50,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -295,6 +302,17 @@ fun BlockOverlayScreen(
         }
 
         if (showPinDialog) {
+            val verifyMasterCode: () -> Unit = {
+                if (preferences.verifyGuardianPin(pinInput)) {
+                    preferences.clearLockdown()
+                    preferences.setShieldDesiredActive(true)
+                    showPinDialog = false
+                    onDismiss()
+                } else {
+                    pinError = "Incorrect Master Code. Use Double-Time Wait if unknown."
+                    pinInput = ""
+                }
+            }
             AlertDialog(
                 onDismissRequest = { showPinDialog = false },
                 containerColor = AegisLavenderSoft,
@@ -312,10 +330,20 @@ fun BlockOverlayScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = pinInput,
-                            onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pinInput = it },
+                            onValueChange = {
+                                if (it.length <= 8 && it.all { c -> c.isDigit() }) {
+                                    pinInput = it
+                                    pinError = null
+                                }
+                            },
                             label = { Text("Master Code / PIN") },
                             visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.NumberPassword,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(onDone = { verifyMasterCode() }),
+                            singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             isError = pinError != null,
                             colors = OutlinedTextFieldDefaults.colors(
@@ -324,7 +352,18 @@ fun BlockOverlayScreen(
                                 focusedTextColor = AegisTextPrimary,
                                 unfocusedTextColor = AegisTextPrimary
                             ),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onPreviewKeyEvent { event ->
+                                    if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                                        if (event.type == KeyEventType.KeyDown) {
+                                            verifyMasterCode()
+                                        }
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
                         )
                         if (pinError != null) {
                             Text(
@@ -368,16 +407,7 @@ fun BlockOverlayScreen(
                 },
                 confirmButton = {
                     Button(
-                        onClick = {
-                            if (preferences.verifyGuardianPin(pinInput)) {
-                                preferences.clearLockdown()
-                                preferences.setShieldDesiredActive(true)
-                                showPinDialog = false
-                                onDismiss()
-                            } else {
-                                pinError = "Incorrect Master Code. Use Double-Time Wait if unknown."
-                            }
-                        },
+                        onClick = verifyMasterCode,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AegisPrimaryCyan,
                             contentColor = AegisOnPrimaryWhite

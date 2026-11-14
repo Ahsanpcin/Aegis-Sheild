@@ -325,10 +325,8 @@ fun SecurityHistoryScreen(
                         IncidentItemCard(
                             incident = incident,
                             onToggleFalsePositive = {
-                                masterKeyGate.request("update incident review status") {
-                                    scope.launch {
-                                        historyRepo.markFalsePositive(incident.id, !incident.isReviewedFalsePositive)
-                                    }
+                                scope.launch {
+                                    historyRepo.markFalsePositive(incident.id, !incident.isReviewedFalsePositive)
                                 }
                             }
                         )

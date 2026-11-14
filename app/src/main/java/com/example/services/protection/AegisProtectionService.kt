@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
@@ -66,6 +67,7 @@ class AegisProtectionService : Service() {
     private var fpsCounter: Int = 0
     private var lastFpsSampleTime: Long = 0L
     private var isStopped = false
+    private val powerManager by lazy { getSystemService(Context.POWER_SERVICE) as? PowerManager }
 
     override fun onCreate() {
         super.onCreate()
@@ -196,6 +198,11 @@ class AegisProtectionService : Service() {
             } catch (_: Exception) {
                 null
             } ?: return@setOnImageAvailableListener
+
+            if (container.preferences.pauseWhenScreenOff.value && powerManager?.isInteractive == false) {
+                image.close()
+                return@setOnImageAvailableListener
+            }
 
             val currentTime = SystemClock.uptimeMillis()
             val dynamicIntervalMs = container.preferences.scanIntervalMs.value.toLong().coerceIn(100L, 2000L)

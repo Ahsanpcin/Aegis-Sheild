@@ -31,24 +31,36 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Update
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
+import com.example.core.update.UpdateChecker
+import com.example.core.update.UpdateInfo
 import com.example.data.preferences.AegisPreferences
 import com.example.ui.components.AhsanTcrBrandingPill
 import com.example.ui.components.CyberCard
@@ -60,18 +72,22 @@ import com.example.ui.settings.AdvancedPrecisionLabSection
 import com.example.ui.settings.AppVersionSecretCard
 import com.example.ui.theme.AegisCardBorder
 import com.example.ui.theme.AegisChampagneGold
+import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisGoldBorder
 import com.example.ui.theme.AegisGoldBright
 import com.example.ui.theme.AegisLavenderBorder
 import com.example.ui.theme.AegisLavenderLight
+import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextPrimary
 import com.example.ui.theme.AegisTextSecondary
+import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
+import kotlinx.coroutines.launch
 
 private data class FaqEntry(
     val question: String,
@@ -138,7 +154,14 @@ fun AboutScreen(
                     AdvancedPrecisionLabSection(preferences = preferences)
                 }
 
-                // 2. Developer & Sponsoring Information Widget
+                // 2. App Update Checker Widget
+                item {
+                    LuxurySectionHeader(title = "App Updates", accentColor = AegisPrimaryCyan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AppUpdateCheckerCard()
+                }
+
+                // 3. Developer & Sponsoring Information Widget
                 item {
                     LuxurySectionHeader(title = "Developer", accentColor = AegisChampagneGold)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -195,7 +218,7 @@ fun AboutScreen(
                     }
                 }
 
-                // 3. FAQs & Q/Answers Widget
+                // 4. FAQs & Q/Answers Widget
                 item {
                     LuxurySectionHeader(title = "FAQs & Q/A", accentColor = AegisPurple)
                 }
@@ -295,6 +318,159 @@ fun AboutScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AppUpdateCheckerCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isChecking by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var showUpToDateDialog by remember { mutableStateOf(false) }
+    var checkError by remember { mutableStateOf<String?>(null) }
+
+    CyberCard(
+        borderColor = AegisLavenderBorder,
+        tone = CyberCardTone.SKY,
+        modifier = Modifier.testTag("app_update_checker_card")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(AegisPrimaryCyan, AegisPurple)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Update,
+                        contentDescription = null,
+                        tint = AegisOnPrimaryWhite,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "App Update Checker",
+                        color = AegisTextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalDisplayFont
+                    )
+                    Text(
+                        text = "Check GitHub Releases for new updates",
+                        color = AegisTextSecondary,
+                        fontSize = 11.sp,
+                        fontFamily = ClassicalBodyFont
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Button(
+            onClick = {
+                isChecking = true
+                checkError = null
+                scope.launch {
+                    val result = UpdateChecker.checkForUpdates()
+                    isChecking = false
+                    result.onSuccess { info ->
+                        updateInfo = info
+                        if (!info.isUpdateAvailable) {
+                            showUpToDateDialog = true
+                        }
+                    }.onFailure { err ->
+                        checkError = err.message ?: "Failed to check for updates"
+                    }
+                }
+            },
+            enabled = !isChecking,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = AegisPrimaryCyan,
+                contentColor = AegisOnPrimaryWhite
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp)
+        ) {
+            if (isChecking) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisOnPrimaryWhite, strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("CHECKING GITHUB...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            } else {
+                Icon(imageVector = Icons.Default.Update, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("CHECK FOR UPDATES", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+
+        if (checkError != null) {
+            Text(
+                text = checkError!!,
+                color = AegisWarningAmber,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    }
+
+    if (showUpToDateDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpToDateDialog = false },
+            containerColor = AegisLavenderSoft,
+            title = { Text("App is Up to Date", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
+            text = { Text("You are running the latest version (${BuildConfig.VERSION_NAME}) of Sheildlenz.", fontFamily = ClassicalBodyFont) },
+            confirmButton = {
+                Button(onClick = { showUpToDateDialog = false }) {
+                    Text("OK", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    updateInfo?.let { info ->
+        if (info.isUpdateAvailable) {
+            AlertDialog(
+                onDismissRequest = { updateInfo = null },
+                containerColor = AegisChampagneSoft,
+                title = { Text("New Version Available (${info.latestVersion})", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text("Current version: ${info.currentVersion}", color = AegisTextSecondary, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("Release Notes:\n${info.releaseNotes ?: "Bug fixes and improvements"}", color = AegisTextPrimary, fontSize = 12.sp)
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            UpdateChecker.openReleaseUrl(context, info.releaseUrl)
+                            updateInfo = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
+                    ) {
+                        Text("DOWNLOAD UPDATE", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { updateInfo = null }) {
+                        Text("LATER")
+                    }
+                }
+            )
         }
     }
 }

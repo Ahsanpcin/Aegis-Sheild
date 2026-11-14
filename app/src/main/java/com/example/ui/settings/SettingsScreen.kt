@@ -1,5 +1,7 @@
 package com.example.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,9 +21,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatterySaver
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,17 +51,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.SensitivityLevel
 import com.example.data.preferences.AegisPreferences
+import com.example.data.preferences.PowerMode
 import com.example.data.repository.ProtectionRepository
 import com.example.detection.classifier.ModelManager
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
@@ -106,6 +123,10 @@ fun SettingsScreen(
     val doubleTimeMultiplier by preferences.doubleTimeMultiplier.collectAsState()
     val waitCooldownBeforePin by preferences.waitCooldownBeforePassword.collectAsState()
     val antiTamperEnabled by preferences.antiTamperEnabled.collectAsState()
+    val powerMode by preferences.powerMode.collectAsState()
+    val skipDuplicateFrames by preferences.skipDuplicateFrames.collectAsState()
+    val captureWidthPx by preferences.captureWidthPx.collectAsState()
+    val pauseWhenScreenOff by preferences.pauseWhenScreenOff.collectAsState()
 
     val stage1DurationLabel = AegisPreferences.formatMinutesLabel(lockdownDurationMinutes)
     val doubleDurationLabel = AegisPreferences.formatMinutesLabel(
@@ -153,6 +174,109 @@ fun SettingsScreen(
                             masterKeyGate.request(label) { action() }
                         }
                     )
+                }
+
+                // 2. Power & Performance Mode Widget + Power-Saving Options
+                item {
+                    LuxurySectionHeader(title = "Power & Performance Mode", accentColor = AegisPrimaryCyan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CyberCard(
+                        borderColor = AegisCardBorder,
+                        tone = CyberCardTone.SKY,
+                        modifier = Modifier.testTag("power_mode_widget")
+                    ) {
+                        Text(
+                            text = "Shield Mode",
+                            color = AegisTextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalDisplayFont
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = powerMode.caption,
+                            color = AegisPrimaryCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = ClassicalBodyFont
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PowerModeTile(
+                                mode = PowerMode.POWER_SAVING,
+                                icon = Icons.Default.BatterySaver,
+                                accentColor = AegisPrimaryCyan,
+                                selected = powerMode == PowerMode.POWER_SAVING,
+                                onClick = { preferences.setPowerMode(PowerMode.POWER_SAVING) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("power_mode_power_saving")
+                            )
+                            PowerModeTile(
+                                mode = PowerMode.BALANCED,
+                                icon = Icons.Default.Tune,
+                                accentColor = AegisPurple,
+                                selected = powerMode == PowerMode.BALANCED,
+                                onClick = { preferences.setPowerMode(PowerMode.BALANCED) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("power_mode_balanced")
+                            )
+                            PowerModeTile(
+                                mode = PowerMode.EXTREME,
+                                icon = Icons.Default.Bolt,
+                                accentColor = AegisChampagneGold,
+                                selected = powerMode == PowerMode.EXTREME,
+                                onClick = { preferences.setPowerMode(PowerMode.EXTREME) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("power_mode_extreme")
+                            )
+                        }
+
+                        HorizontalDivider(
+                            color = AegisCardBorder.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+
+                        Text(
+                            text = "Power-Saving Options",
+                            color = AegisTextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalDisplayFont
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        PowerOptionSwitchRow(
+                            title = "Skip Static Frames",
+                            subtitle = "Save battery on unchanged screens",
+                            checked = skipDuplicateFrames,
+                            onCheckedChange = { preferences.setSkipDuplicateFrames(it) },
+                            testTag = "power_opt_skip_duplicates"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PowerOptionSwitchRow(
+                            title = "Compact Capture (320px)",
+                            subtitle = "Lower resolution saves GPU & RAM",
+                            checked = captureWidthPx <= 320,
+                            onCheckedChange = { preferences.setCompactPowerResolution(it) },
+                            testTag = "power_opt_compact_capture"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PowerOptionSwitchRow(
+                            title = "Pause While Screen Off",
+                            subtitle = "Sleep frame scanner when locked",
+                            checked = pauseWhenScreenOff,
+                            onCheckedChange = { preferences.setPauseWhenScreenOff(it) },
+                            testTag = "power_opt_pause_screen_off"
+                        )
+                    }
                 }
 
                 // 2. PIN Change of Guardian
@@ -545,11 +669,9 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = {
-                                    masterKeyGate.request("activate Device Admin") {
-                                        preferences.grantTemporarySettingsAuthorization()
-                                        context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
-                                        isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
-                                    }
+                                    preferences.grantTemporarySettingsAuthorization()
+                                    context.startActivity(AegisDeviceAdminReceiver.createActivateAdminIntent(context))
+                                    isDeviceAdmin = AegisDeviceAdminReceiver.isDeviceAdmin(context)
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = AegisPrimaryCyan,
@@ -571,6 +693,22 @@ fun SettingsScreen(
             }
 
             if (showPinDialog) {
+                val confirmFocusRequester = remember { FocusRequester() }
+                val saveNewPin: () -> Unit = {
+                    when {
+                        pinInput.length < 4 -> {
+                            pinError = "PIN must be at least 4 digits"
+                        }
+                        pinInput != confirmPinInput -> {
+                            pinError = "PINs do not match"
+                            confirmPinInput = ""
+                        }
+                        else -> {
+                            preferences.setGuardianPin(pinInput)
+                            showPinDialog = false
+                        }
+                    }
+                }
                 AlertDialog(
                     onDismissRequest = { showPinDialog = false },
                     containerColor = AegisLavenderSoft,
@@ -601,7 +739,13 @@ fun SettingsScreen(
                                 },
                                 label = { Text("New Guardian PIN") },
                                 visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.NumberPassword,
+                                    imeAction = ImeAction.Next
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onNext = { confirmFocusRequester.requestFocus() }
+                                ),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 isError = pinError != null,
@@ -615,6 +759,16 @@ fun SettingsScreen(
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .onPreviewKeyEvent { event ->
+                                        if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                                            if (event.type == KeyEventType.KeyDown) {
+                                                confirmFocusRequester.requestFocus()
+                                            }
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
                                     .testTag("change_pin_input")
                             )
                             Spacer(modifier = Modifier.height(10.dp))
@@ -628,7 +782,13 @@ fun SettingsScreen(
                                 },
                                 label = { Text("Confirm New PIN") },
                                 visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.NumberPassword,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = { saveNewPin() }
+                                ),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 isError = pinError != null,
@@ -642,6 +802,17 @@ fun SettingsScreen(
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .focusRequester(confirmFocusRequester)
+                                    .onPreviewKeyEvent { event ->
+                                        if (event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                                            if (event.type == KeyEventType.KeyDown) {
+                                                saveNewPin()
+                                            }
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
                                     .testTag("change_pin_confirm_input")
                             )
                             if (pinError != null) {
@@ -657,21 +828,7 @@ fun SettingsScreen(
                     },
                     confirmButton = {
                         Button(
-                            onClick = {
-                                when {
-                                    pinInput.length < 4 -> {
-                                        pinError = "PIN must be at least 4 digits"
-                                    }
-                                    pinInput != confirmPinInput -> {
-                                        pinError = "PINs do not match"
-                                        confirmPinInput = ""
-                                    }
-                                    else -> {
-                                        preferences.setGuardianPin(pinInput)
-                                        showPinDialog = false
-                                    }
-                                }
-                            },
+                            onClick = saveNewPin,
                             colors = ButtonDefaults.buttonColors(containerColor = AegisPurple, contentColor = AegisOnPrimaryWhite),
                             modifier = Modifier.testTag("change_pin_save_button")
                         ) {
@@ -692,5 +849,108 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PowerModeTile(
+    mode: PowerMode,
+    icon: ImageVector,
+    accentColor: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val containerFill by animateColorAsState(
+        targetValue = if (selected) accentColor else AegisCardBackground.copy(alpha = 0.85f),
+        animationSpec = tween(durationMillis = 280),
+        label = "PowerModeFill"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) accentColor else AegisCardBorder,
+        animationSpec = tween(durationMillis = 280),
+        label = "PowerModeBorder"
+    )
+    val contentTint = if (selected) AegisOnPrimaryWhite else accentColor
+    val titleColor = if (selected) AegisOnPrimaryWhite else AegisTextPrimary
+    val subColor = if (selected) AegisOnPrimaryWhite.copy(alpha = 0.90f) else AegisTextMuted
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(containerFill)
+            .border(if (selected) 1.6.dp else 1.dp, borderColor, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = mode.displayName,
+            tint = contentTint,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = mode.displayName,
+            color = titleColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = ClassicalDisplayFont,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "${mode.scanIntervalMs}ms",
+            color = subColor,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = ClassicalBodyFont,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun PowerOptionSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+            Text(
+                text = title,
+                color = AegisTextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = ClassicalBodyFont
+            )
+            Text(
+                text = subtitle,
+                color = AegisTextMuted,
+                fontSize = 11.sp,
+                fontFamily = ClassicalBodyFont
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.testTag(testTag),
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = AegisOnPrimaryWhite,
+                checkedTrackColor = AegisPrimaryCyan,
+                uncheckedThumbColor = AegisTextMuted,
+                uncheckedTrackColor = AegisCardBorder
+            )
+        )
     }
 }

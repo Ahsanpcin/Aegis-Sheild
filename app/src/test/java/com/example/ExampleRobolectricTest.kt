@@ -14,6 +14,7 @@ import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
 import com.example.data.local.AegisDatabase
 import com.example.data.preferences.AegisPreferences
+import com.example.data.preferences.PowerMode
 import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
 import com.example.detection.classifier.ActiveModelInfo
@@ -692,5 +693,39 @@ class ExampleRobolectricTest {
         // Subsequent normal app backgrounding (after returning from picker) re-locks Guardian session
         prefs.onAppBackgrounded()
         assertFalse(prefs.isGuardianSessionUnlocked.value)
+    }
+
+    @Test
+    fun `power mode presets configure scan interval, capture width, duplicate skipping, and screen-off pause`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+
+        prefs.setPowerMode(PowerMode.POWER_SAVING)
+        assertEquals(PowerMode.POWER_SAVING, prefs.powerMode.value)
+        assertEquals(650, prefs.scanIntervalMs.value)
+        assertEquals(320, prefs.captureWidthPx.value)
+        assertTrue(prefs.skipDuplicateFrames.value)
+        assertTrue(prefs.pauseWhenScreenOff.value)
+
+        prefs.setPowerMode(PowerMode.EXTREME)
+        assertEquals(PowerMode.EXTREME, prefs.powerMode.value)
+        assertEquals(120, prefs.scanIntervalMs.value)
+        assertEquals(640, prefs.captureWidthPx.value)
+        assertFalse(prefs.skipDuplicateFrames.value)
+        assertFalse(prefs.pauseWhenScreenOff.value)
+
+        // Granular power-saving options toggle cleanly
+        prefs.setCompactPowerResolution(true)
+        assertEquals(320, prefs.captureWidthPx.value)
+        prefs.setPauseWhenScreenOff(true)
+        assertTrue(prefs.pauseWhenScreenOff.value)
+
+        // Reset restores Balanced defaults
+        prefs.resetAdvancedCustomizations()
+        assertEquals(PowerMode.BALANCED, prefs.powerMode.value)
+        assertEquals(300, prefs.scanIntervalMs.value)
+        assertEquals(480, prefs.captureWidthPx.value)
+        assertTrue(prefs.skipDuplicateFrames.value)
+        assertTrue(prefs.pauseWhenScreenOff.value)
     }
 }
