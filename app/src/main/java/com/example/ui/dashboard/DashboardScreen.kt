@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -130,6 +131,10 @@ fun DashboardScreen(
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val telemetry by protectionRepo.telemetry.collectAsState()
+    val scheduleEnabled by preferences.scheduleEnabled.collectAsState()
+    val scheduleStartMinutes by preferences.scheduleStartMinutes.collectAsState()
+    val scheduleEndMinutes by preferences.scheduleEndMinutes.collectAsState()
+    val isWithinScheduledWindow = scheduleEnabled && preferences.isWithinScheduledWindow()
 
     var showOverlayWarningDialog by remember { mutableStateOf(false) }
     var showMissingModelDialog by remember { mutableStateOf(false) }
@@ -475,6 +480,83 @@ fun DashboardScreen(
                                         uncheckedTrackColor = AegisLavenderLight.copy(alpha = 0.55f)
                                     )
                                 )
+                            }
+                        }
+                    }
+                }
+
+                // 1b. Scheduled Guard Window Reminder (when schedule is active now while Shield is OFF)
+                item {
+                    AnimatedVisibility(
+                        visible = isWithinScheduledWindow && !isOn,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        CyberCard(
+                            borderColor = AegisLavenderBorder,
+                            tone = CyberCardTone.LAVENDER,
+                            modifier = Modifier.testTag("scheduled_guard_banner")
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f).padding(end = 10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(AegisPurple),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Schedule,
+                                            contentDescription = "Scheduled Guard Active",
+                                            tint = AegisOnPrimaryWhite,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "Scheduled Guard Window",
+                                            color = AegisTextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = ClassicalDisplayFont
+                                        )
+                                        Text(
+                                            text = "${AegisPreferences.formatClockTime(scheduleStartMinutes)} – ${AegisPreferences.formatClockTime(scheduleEndMinutes)} active now",
+                                            color = AegisPurple,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontFamily = ClassicalBodyFont
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { attemptStartProtection() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = AegisPrimaryCyan,
+                                        contentColor = AegisOnPrimaryWhite
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .height(48.dp)
+                                        .testTag("schedule_arm_now_button")
+                                ) {
+                                    Text(
+                                        text = "ARM",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = ClassicalBodyFont
+                                    )
+                                }
                             }
                         }
                     }

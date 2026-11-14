@@ -13,6 +13,7 @@ import com.example.core.models.SensitivityLevel
 import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
 import com.example.ui.components.SecurityHealthReport
+import com.example.core.update.UpdateChecker
 import com.example.data.local.AegisDatabase
 import com.example.data.preferences.AegisPreferences
 import com.example.data.preferences.PowerMode
@@ -20,12 +21,20 @@ import com.example.data.repository.ProtectionRepository
 import com.example.data.repository.SecurityHistoryRepository
 import com.example.detection.classifier.ActiveModelInfo
 import com.example.detection.classifier.ClassificationResult
+import com.example.detection.classifier.ModelDownloader
 import com.example.detection.classifier.ModelManager
 import com.example.detection.decision.ThreatDecisionEngine
 import com.example.detection.preprocessing.FramePreprocessor
 import com.example.monitoring.accessibility.AegisAccessibilityService
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
+import com.example.ui.history.buildAuditReportText
 import com.example.ui.navigation.isStartupGuardianAuthorized
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -833,5 +842,114 @@ class ExampleRobolectricTest {
         assertTrue(analytics.weeklyTrend.last().isToday)
         assertEquals("Sample Browser", analytics.peakAppDisplayName)
         assertNotNull(analytics.peakHourWindow)
+
+        val report = buildAuditReportText(analytics = analytics, totalDetections = 2, blockedAppCount = 1)
+        assertTrue(report.contains("Sheildlenz Offline Security Audit Report"))
+        assertTrue(report.contains("Total Blocked Detections: 2"))
+        assertTrue(report.contains("Explicit Adult: 1"))
+        assertTrue(report.contains("Most Flagged App: Sample Browser"))
+    }
+
+    @Test
+    fun `update checker targets Ahsanpcin Sheild-Lenz and extracts APK release asset accurately`() {
+        assertEquals("Ahsanpcin", UpdateChecker.GITHUB_OWNER)
+        assertEquals("Sheild-Lenz", UpdateChecker.GITHUB_REPO)
+
+        assertTrue(UpdateChecker.compareVersions("5.1.0", "4.68") > 0)
+        assertTrue(UpdateChecker.compareVersions("4.69", "4.68") > 0)
+        assertEquals(0, UpdateChecker.compareVersions("4.68", "4.68"))
+        assertTrue(UpdateChecker.compareVersions("4.67", "4.68") < 0)
+
+        val fakeRelease = JSONObject().apply {
+            put("tag_name", "v5.0.0")
+            put("html_url", "https://github.com/Ahsanpcin/Sheild-Lenz/releases/tag/v5.0.0")
+            put("body", "In-app APK updater & model zip downloader")
+            put(
+                "assets",
+                JSONArray().apply {
+                    put(
+                        JSONObject().apply {
+                            put("name", "Sheildlenz-v5.0.0.apk")
+                            put(
+                                "browser_download_url",
+                                "https://github.com/Ahsanpcin/Sheild-Lenz/releases/download/v5.0.0/Sheildlenz-v5.0.0.apk"
+                            )
+                            put("size", 18_500_000L)
+                        }
+                    )
+                }
+            )
+        }
+
+        val info = UpdateChecker.parseReleaseJson(fakeRelease, currentVersionName = "4.68")
+        assertTrue(info.isUpdateAvailable)
+        assertEquals("v5.0.0", info.latestVersion)
+        assertEquals(
+            "https://github.com/Ahsanpcin/Sheild-Lenz/releases/download/v5.0.0/Sheildlenz-v5.0.0.apk",
+            info.apkDownloadUrl
+        )
+        assertEquals(18_500_000L, info.apkSizeBytes)
+    }
+
+    @Test
+    fun `model downloader extracts nested tflite safely and rejects path traversal entries`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val zipFile = File(context.cacheDir, "test_model_bundle.zip")
+        val destFile = File(context.cacheDir, "test_extracted.tflite")
+        if (zipFile.exists()) zipFile.delete()
+        if (destFile.exists()) destFile.delete()
+
+        val fakeTfliteBytes = ByteArray(2048) { (it % 127).toByte() }
+        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+            // Malicious traversal entry must be skipped
+            zos.putNextEntry(ZipEntry("../../evil.tflite"))
+            zos.write("bad".toByteArray())
+            zos.closeEntry()
+
+            // macOS resource fork metadata entry must be skipped
+            zos.putNextEntry(ZipEntry("__MACOSX/._nsfw_mobilenet_v2_140_224.tflite"))
+            zos.write("meta".toByteArray())
+            zos.closeEntry()
+
+            // Valid nested .tflite model entry
+            zos.putNextEntry(ZipEntry("models/nsfw_mobilenet_v2_140_224.tflite"))
+            zos.write(fakeTfliteBytes)
+            zos.closeEntry()
+        }
+
+        val extractedName = ModelDownloader.extractTfliteFromZip(zipFile, destFile)
+        assertEquals("nsfw_mobilenet_v2_140_224.tflite", extractedName)
+        assertTrue(destFile.exists())
+        assertEquals(2048L, destFile.length())
+
+        zipFile.delete()
+        destFile.delete()
+    }
+
+    @Test
+    fun `scheduled protection hours evaluates same-day and overnight windows accurately`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = AegisPreferences(context)
+
+        // Overnight window: 9:00 PM (1260) -> 7:00 AM (420)
+        prefs.setScheduleWindow(21 * 60, 7 * 60)
+        prefs.setScheduleEnabled(true)
+
+        assertTrue(prefs.isWithinScheduledWindow(22 * 60)) // 10:00 PM
+        assertTrue(prefs.isWithinScheduledWindow(2 * 60))  // 2:00 AM
+        assertFalse(prefs.isWithinScheduledWindow(12 * 60)) // 12:00 PM
+
+        // Same-day window: 2:00 PM (840) -> 6:00 PM (1080)
+        prefs.setScheduleWindow(14 * 60, 18 * 60)
+        assertTrue(prefs.isWithinScheduledWindow(15 * 60))  // 3:00 PM
+        assertFalse(prefs.isWithinScheduledWindow(20 * 60)) // 8:00 PM
+
+        prefs.setScheduleEnabled(false)
+        assertFalse(prefs.isWithinScheduledWindow(15 * 60))
+
+        assertEquals("9:00 PM", AegisPreferences.formatClockTime(21 * 60))
+        assertEquals("7:00 AM", AegisPreferences.formatClockTime(7 * 60))
+        assertEquals("12:00 AM", AegisPreferences.formatClockTime(0))
     }
 }
+

@@ -6,6 +6,10 @@ on:
       - main
       - master
 
+concurrency:
+  group: auto-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -17,51 +21,55 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Increment Major Version by 1 and Randomize Patch in build.gradle.kts
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Bump Version (+0.55 to +0.85) & Prepare Signing Keystore
         run: |
-          # Extract current versionCode and versionName
           CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
           NEW_CODE=$((CURRENT_CODE + 1))
-          
+
           CURRENT_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
-          # Extract the integer before the dot (e.g., "2.8" -> 2)
-          CURRENT_MAJOR=$(echo $CURRENT_NAME | cut -d. -f1)
-          NEW_MAJOR=$((CURRENT_MAJOR + 1))
-          
-          # Generate a random number between 10 and 99 for after the dot
-          RANDOM_PATCH=$(( ( RANDOM % 90 )  + 10 ))
-          
-          NEW_NAME="${NEW_MAJOR}.${RANDOM_PATCH}"
-          
-          echo "Bumping version: v$CURRENT_NAME ($CURRENT_CODE) -> v$NEW_NAME ($NEW_CODE)"
-          
-          # Update build.gradle.kts
+          MAJOR_PART=$(echo "$CURRENT_NAME" | cut -d. -f1)
+          MINOR_RAW=$(echo "$CURRENT_NAME" | cut -d. -f2)
+
+          if [ "$MINOR_RAW" = "$CURRENT_NAME" ] || [ -z "$MINOR_RAW" ]; then
+            MINOR_PART=0
+          elif [ "${#MINOR_RAW}" -eq 1 ]; then
+            MINOR_PART=$((10#$MINOR_RAW * 10))
+          else
+            MINOR_PART=$((10#${MINOR_RAW:0:2}))
+          fi
+
+          TOTAL_HUNDREDTHS=$((10#$MAJOR_PART * 100 + MINOR_PART))
+          INCREMENT=$(shuf -i 55-85 -n 1)
+          NEW_TOTAL=$((TOTAL_HUNDREDTHS + INCREMENT))
+
+          NEW_MAJOR=$((NEW_TOTAL / 100))
+          NEW_MINOR=$((NEW_TOTAL % 100))
+          NEW_NAME=$(printf "%d.%02d" "$NEW_MAJOR" "$NEW_MINOR")
+
+          echo "Bumping version (+0.${INCREMENT}): v$CURRENT_NAME ($CURRENT_CODE) -> v$NEW_NAME ($NEW_CODE)"
+
           sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/g" app/build.gradle.kts
           sed -i "s/versionName = \"$CURRENT_NAME\"/versionName = \"$NEW_NAME\"/g" app/build.gradle.kts
-          
-          echo "NEW_NAME=$NEW_NAME" >> $GITHUB_ENV
-          echo "NEW_CODE=$NEW_CODE" >> $GITHUB_ENV
 
-      - name: Commit Version Bump
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add app/build.gradle.kts
-          git commit -m "Bump version to v${{ env.NEW_NAME }} (Code ${{ env.NEW_CODE }}) [skip ci]"
-          git push
+          echo "NEW_NAME=$NEW_NAME" >> "$GITHUB_ENV"
+          echo "NEW_CODE=$NEW_CODE" >> "$GITHUB_ENV"
+          echo "INCREMENT_LABEL=0.${INCREMENT}" >> "$GITHUB_ENV"
 
-      - name: Prepare Keystore for Release Signing
-        run: |
-          keytool -genkeypair -v \
-            -keystore "${{ github.workspace }}/release.jks" \
+          keytool -genkeypair \
+            -keystore "/tmp/release.jks" \
             -alias upload \
             -keyalg RSA \
             -keysize 2048 \
@@ -70,20 +78,33 @@ jobs:
             -keypass android \
             -dname "CN=Sheildlenz, OU=Android, O=Sheildlenz, L=Global, S=Global, C=US"
 
-      - name: Build Release APK
-        run: gradle assembleRelease -x lint -x test
+      - name: Build Release APK (Fast)
+        run: gradle assembleRelease --build-cache --parallel --no-daemon -x lint -x test
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
+          KEYSTORE_PATH: /tmp/release.jks
           STORE_PASSWORD: android
           KEY_PASSWORD: android
+
+      - name: Commit & Push Version Bump
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "Bump version to v${{ env.NEW_NAME }} (Code ${{ env.NEW_CODE }}) [skip ci]"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push
+          echo "BUMPED_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.NEW_NAME }}
+          target_commitish: ${{ env.BUMPED_SHA }}
           name: Sheildlenz v${{ env.NEW_NAME }} (Build ${{ env.NEW_CODE }})
           files: app/build/outputs/apk/release/*.apk
+          make_latest: true
+          fail_on_unmatched_files: true
           body: |
-            Automated release v${{ env.NEW_NAME }} (Code ${{ env.NEW_CODE }}).
+            Automated release v${{ env.NEW_NAME }} (Code ${{ env.NEW_CODE }}, +${{ env.INCREMENT_LABEL }}).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

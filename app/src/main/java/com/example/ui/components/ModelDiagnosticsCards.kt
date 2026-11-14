@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.EngineTelemetry
 import com.example.core.models.SensitivityLevel
+import com.example.detection.classifier.ModelDownloadState
+import com.example.detection.classifier.ModelDownloader
 import com.example.detection.classifier.ModelImportResult
 import com.example.detection.classifier.ModelManager
 import com.example.detection.classifier.SampleImageTester
@@ -80,6 +84,7 @@ import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
 import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -90,12 +95,37 @@ fun ModelManagerCard(
     onModelUpdated: () -> Unit,
     modifier: Modifier = Modifier,
     cardTone: CyberCardTone? = null,
+    showCloudDownloader: Boolean = false,
     onBeforeOpenPicker: () -> Unit = {},
     onRequireAuth: (actionLabel: String, onAuthorized: () -> Unit) -> Unit = { _, action -> action() }
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isImporting by remember { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
+    var downloadState by remember { mutableStateOf<ModelDownloadState>(ModelDownloadState.Idle) }
+    var downloadJob by remember { mutableStateOf<Job?>(null) }
+    val isDownloadingOrUnzipping = downloadState is ModelDownloadState.Downloading ||
+        downloadState is ModelDownloadState.Extracting ||
+        downloadState is ModelDownloadState.Validating
+
+    val startCloudDownload: (Int) -> Unit = { linkIndex ->
+        localError = null
+        downloadJob = scope.launch {
+            val result = ModelDownloader.downloadAndInstallZipModel(
+                context = context,
+                modelManager = modelManager,
+                linkIndex = linkIndex,
+                onStateChanged = { state -> downloadState = state }
+            )
+            if (result is ModelImportResult.Success) {
+                localError = null
+                onModelUpdated()
+            } else if (result is ModelImportResult.Failure) {
+                onModelUpdated()
+            }
+        }
+    }
 
     val modelPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -257,7 +287,212 @@ fun ModelManagerCard(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        if (showCloudDownloader) {
+            Spacer(modifier = Modifier.height(10.dp))
+
+            AnimatedVisibility(visible = isDownloadingOrUnzipping) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AegisSurfaceElevated)
+                        .border(1.dp, AegisCardBorder, RoundedCornerShape(14.dp))
+                        .padding(12.dp)
+                ) {
+                    when (val state = downloadState) {
+                        is ModelDownloadState.Downloading -> {
+                            val pctLabel = state.progress?.let { "${(it * 100).toInt()}%" } ?: "..."
+                            val sizeLabel = if (state.totalBytes > 0L) {
+                                "${ModelDownloader.formatBytesMb(state.bytesDownloaded)} / ${ModelDownloader.formatBytesMb(state.totalBytes)}"
+                            } else {
+                                ModelDownloader.formatBytesMb(state.bytesDownloaded)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Downloading Link ${state.linkIndex} • $pctLabel",
+                                    color = AegisPrimaryCyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                                Text(
+                                    text = sizeLabel,
+                                    color = AegisTextSecondary,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            if (state.progress != null) {
+                                LinearProgressIndicator(
+                                    progress = { state.progress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = AegisPrimaryCyan,
+                                    trackColor = AegisPrimaryCyan.copy(alpha = 0.18f),
+                                    strokeCap = StrokeCap.Round
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = AegisPrimaryCyan,
+                                    trackColor = AegisPrimaryCyan.copy(alpha = 0.18f)
+                                )
+                            }
+                        }
+                        ModelDownloadState.Extracting -> {
+                            Text(
+                                text = "Unzipping .tflite model automatically...",
+                                color = AegisPurple,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = ClassicalBodyFont
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = AegisPurple,
+                                trackColor = AegisPurple.copy(alpha = 0.18f)
+                            )
+                        }
+                        ModelDownloadState.Validating -> {
+                            Text(
+                                text = "Validating & loading AI Classifier...",
+                                color = AegisChampagneGold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = ClassicalBodyFont
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = AegisChampagneGold,
+                                trackColor = AegisChampagneGold.copy(alpha = 0.18f)
+                            )
+                        }
+                        else -> {}
+                    }
+                }
+            }
+
+            Button(
+                onClick = {
+                    if (isDownloadingOrUnzipping) {
+                        downloadJob?.cancel()
+                        downloadState = ModelDownloadState.Idle
+                    } else if (telemetry.isModelLoaded) {
+                        onRequireAuth("download & replace AI model") {
+                            startCloudDownload(1)
+                        }
+                    } else {
+                        startCloudDownload(1)
+                    }
+                },
+                enabled = !isImporting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDownloadingOrUnzipping) AegisWarningAmber else AegisPrimaryCyan,
+                    contentColor = AegisOnPrimaryWhite
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("download_tflite_model_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = when {
+                        isDownloadingOrUnzipping -> "CANCEL DOWNLOAD"
+                        telemetry.isModelLoaded -> "DOWNLOAD / REFRESH MODEL (.ZIP)"
+                        else -> "DOWNLOAD AI MODEL (.ZIP)"
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalBodyFont,
+                    letterSpacing = 0.6.sp
+                )
+            }
+
+            val failedState = downloadState as? ModelDownloadState.Failed
+            AnimatedVisibility(visible = failedState != null) {
+                failedState?.let { err ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(AegisChampagneSoft)
+                            .border(1.dp, AegisGoldBorder, RoundedCornerShape(14.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = err.message,
+                            color = AegisTextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = ClassicalBodyFont
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                val fallbackLink = if (err.linkIndex == 1) 2 else 1
+                                if (telemetry.isModelLoaded) {
+                                    onRequireAuth("download AI model from Link $fallbackLink") {
+                                        startCloudDownload(fallbackLink)
+                                    }
+                                } else {
+                                    startCloudDownload(fallbackLink)
+                                }
+                            },
+                            enabled = !isDownloadingOrUnzipping && !isImporting,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = AegisOnPrimaryWhite.copy(alpha = 0.6f),
+                                contentColor = AegisChampagneGold
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("download_tflite_link2_button")
+                        ) {
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (err.linkIndex == 1) "TRY LINK 2 (DROPBOX MIRROR)" else "RETRY LINK 1 (GITHUB)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = ClassicalBodyFont
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+        } else {
+            Spacer(modifier = Modifier.height(14.dp))
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -275,7 +510,7 @@ fun ModelManagerCard(
                         modelPickerLauncher.launch(arrayOf("*/*"))
                     }
                 },
-                enabled = !isImporting,
+                enabled = !isImporting && !isDownloadingOrUnzipping,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (telemetry.isModelLoaded) AegisPurple else AegisPrimaryCyan,
                     contentColor = AegisOnPrimaryWhite
@@ -319,9 +554,11 @@ fun ModelManagerCard(
                         onRequireAuth("remove AI model") {
                             modelManager.clearImportedModel()
                             localError = null
+                            downloadState = ModelDownloadState.Idle
                             onModelUpdated()
                         }
                     },
+                    enabled = !isDownloadingOrUnzipping,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = AegisChampagneSoft,

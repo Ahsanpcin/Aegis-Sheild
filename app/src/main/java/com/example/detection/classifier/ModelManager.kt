@@ -146,32 +146,52 @@ class ModelManager(
                 return ModelImportResult.Failure("Selected file is empty or too small to be a valid TFLite model.")
             }
 
-            val validation = validateModelFile(stagingFile, displayName, "Phone Storage")
-            if (validation is ModelImportResult.Failure) {
-                stagingFile.delete()
-                return validation
-            }
-
-            val target = activeModelFile
-            if (target.exists()) {
-                target.delete()
-            }
-            if (!stagingFile.renameTo(target)) {
-                stagingFile.copyTo(target, overwrite = true)
-                stagingFile.delete()
-            }
-
-            preferences.setImportedModelName(displayName)
-            val updatedInfo = (validation as ModelImportResult.Success).info
-            _activeModelInfo.value = updatedInfo
-            _modelVersion.value += 1
-            Log.i(TAG, "Successfully imported TFLite model: $displayName (${updatedInfo.inputSpecLabel}, ${updatedInfo.outputClassCount} classes)")
-            return ModelImportResult.Success(updatedInfo)
+            return promoteValidatedModel(stagingFile, displayName)
         } catch (e: Exception) {
             stagingFile.delete()
             Log.e(TAG, "Model import failed for $uri", e)
             return ModelImportResult.Failure("Import failed: ${e.message ?: "Unknown I/O error"}")
         }
+    }
+
+    fun importModelFromFile(sourceFile: File, displayName: String): ModelImportResult {
+        val cleanName = displayName.ifBlank { "downloaded_model.tflite" }
+        val stagingFile = File(modelsDir, "staging_classifier.tflite")
+        return try {
+            if (!sourceFile.exists() || sourceFile.length() < 1024L) {
+                return ModelImportResult.Failure("Model file is empty or too small to be a valid TFLite model.")
+            }
+            sourceFile.copyTo(stagingFile, overwrite = true)
+            promoteValidatedModel(stagingFile, cleanName)
+        } catch (e: Exception) {
+            stagingFile.delete()
+            Log.e(TAG, "Model file import failed for $cleanName", e)
+            ModelImportResult.Failure("Import failed: ${e.message ?: "Unknown I/O error"}")
+        }
+    }
+
+    private fun promoteValidatedModel(stagingFile: File, displayName: String): ModelImportResult {
+        val validation = validateModelFile(stagingFile, displayName, "Phone Storage")
+        if (validation is ModelImportResult.Failure) {
+            stagingFile.delete()
+            return validation
+        }
+
+        val target = activeModelFile
+        if (target.exists()) {
+            target.delete()
+        }
+        if (!stagingFile.renameTo(target)) {
+            stagingFile.copyTo(target, overwrite = true)
+            stagingFile.delete()
+        }
+
+        preferences.setImportedModelName(displayName)
+        val updatedInfo = (validation as ModelImportResult.Success).info
+        _activeModelInfo.value = updatedInfo
+        _modelVersion.value += 1
+        Log.i(TAG, "Successfully imported TFLite model: $displayName (${updatedInfo.inputSpecLabel}, ${updatedInfo.outputClassCount} classes)")
+        return ModelImportResult.Success(updatedInfo)
     }
 
     fun clearImportedModel() {

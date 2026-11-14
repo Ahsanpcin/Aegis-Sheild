@@ -1,5 +1,6 @@
 package com.example.ui.history
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -48,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.models.SecurityIncident
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.SecurityHistoryRepository
+import com.example.data.repository.ThreatAnalyticsSummary
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
@@ -106,6 +110,7 @@ fun SecurityHistoryScreen(
     historyRepo: SecurityHistoryRepository,
     preferences: AegisPreferences
 ) {
+    val context = LocalContext.current
     val incidents by historyRepo.getIncidents().collectAsState(initial = emptyList())
     val totalDetections by historyRepo.getTotalDetectionsCount().collectAsState(initial = 0)
     val blockedAppCount by historyRepo.getBlockedAppCount().collectAsState(initial = 0)
@@ -140,6 +145,31 @@ fun SecurityHistoryScreen(
                     title = "Progress",
                     subtitle = "Threat Analytics & Protection Ledger",
                     actions = {
+                        IconButton(
+                            onClick = {
+                                val reportText = buildAuditReportText(
+                                    analytics = analytics,
+                                    totalDetections = totalDetections,
+                                    blockedAppCount = blockedAppCount
+                                )
+                                preferences.beginAuthorizedExternalFlow()
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "Sheildlenz Security Audit Report")
+                                    putExtra(Intent.EXTRA_TEXT, reportText)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(sendIntent, "Export Sheildlenz Audit Report")
+                                )
+                            },
+                            modifier = Modifier.testTag("export_audit_report_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Export Audit Report",
+                                tint = AegisPrimaryCyan
+                            )
+                        }
                         if (incidents.isNotEmpty()) {
                             IconButton(
                                 onClick = {
@@ -536,3 +566,31 @@ fun IncidentItemCard(
         }
     }
 }
+
+internal fun buildAuditReportText(
+    analytics: ThreatAnalyticsSummary,
+    totalDetections: Int,
+    blockedAppCount: Int,
+    generatedAtMillis: Long = System.currentTimeMillis()
+): String {
+    val generatedDate = SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.US)
+        .format(Date(generatedAtMillis))
+    val weeklyTotal = analytics.weeklyTrend.sumOf { it.count }
+    val topApp = analytics.peakAppDisplayName ?: "None"
+    return buildString {
+        appendLine("Sheildlenz Offline Security Audit Report")
+        appendLine("Generated: $generatedDate")
+        appendLine("----------------------------------------")
+        appendLine("Total Blocked Detections: $totalDetections")
+        appendLine("Unique Blocked Apps: $blockedAppCount")
+        appendLine("Last 7 Days Detections: $weeklyTotal")
+        appendLine("Peak Threat Window: ${analytics.peakHourWindow}")
+        appendLine("Most Flagged App: $topApp")
+        appendLine("")
+        appendLine("Category Breakdown:")
+        appendLine("- Explicit Adult: ${analytics.explicitAdultCount}")
+        appendLine("- Suggestive Content: ${analytics.suggestiveCount}")
+        appendLine("- Sensitive Graphic: ${analytics.sensitiveGraphicCount}")
+    }.trim()
+}
+

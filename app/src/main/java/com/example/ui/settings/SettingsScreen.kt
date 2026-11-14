@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -82,8 +83,10 @@ import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
+import com.example.ui.components.MasterKeyGateState
 import com.example.ui.components.ModelManagerCard
 import com.example.ui.components.SheildlenzBackdrop
+import com.example.ui.components.StatusPill
 import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
@@ -171,6 +174,7 @@ fun SettingsScreen(
                         modelManager = modelManager,
                         onModelUpdated = onModelUpdated,
                         cardTone = CyberCardTone.LAVENDER,
+                        showCloudDownloader = true,
                         onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() },
                         onRequireAuth = { label, action ->
                             masterKeyGate.request(label) { action() }
@@ -284,6 +288,14 @@ fun SettingsScreen(
                 // App Whitelisting & Exclusion Rules
                 item {
                     WhitelistedAppsSection(preferences = preferences)
+                }
+
+                // Scheduled Active Protection Hours ("Bedtime / Study Guard")
+                item {
+                    ScheduledProtectionSection(
+                        preferences = preferences,
+                        masterKeyGate = masterKeyGate
+                    )
                 }
 
                 // 2. PIN Change of Guardian
@@ -1098,3 +1110,261 @@ fun WhitelistedAppsSection(preferences: AegisPreferences) {
         )
     }
 }
+
+@Composable
+private fun ScheduledProtectionSection(
+    preferences: AegisPreferences,
+    masterKeyGate: MasterKeyGateState
+) {
+    val scheduleEnabled by preferences.scheduleEnabled.collectAsState()
+    val startMinutes by preferences.scheduleStartMinutes.collectAsState()
+    val endMinutes by preferences.scheduleEndMinutes.collectAsState()
+    val isActiveNow = scheduleEnabled && preferences.isWithinScheduledWindow()
+
+    LuxurySectionHeader(title = "Scheduled Protection Hours", accentColor = AegisPurple)
+    Spacer(modifier = Modifier.height(8.dp))
+    CyberCard(
+        borderColor = if (isActiveNow) AegisPrimaryCyan.copy(alpha = 0.55f) else AegisLavenderBorder,
+        tone = CyberCardTone.LAVENDER,
+        modifier = Modifier.testTag("scheduled_protection_card")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f).padding(end = 10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(AegisPurple, AegisPrimaryCyan)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = "Scheduled protection hours",
+                        tint = AegisOnPrimaryWhite,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Bedtime & Study Guard",
+                        color = AegisTextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalDisplayFont
+                    )
+                    Text(
+                        text = "${AegisPreferences.formatClockTime(startMinutes)} → ${AegisPreferences.formatClockTime(endMinutes)}",
+                        color = if (scheduleEnabled) AegisPrimaryCyan else AegisTextMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = ClassicalBodyFont
+                    )
+                }
+            }
+
+            Switch(
+                checked = scheduleEnabled,
+                onCheckedChange = { enabled ->
+                    if (!enabled) {
+                        masterKeyGate.request("disable Scheduled Protection Hours") {
+                            preferences.setScheduleEnabled(false)
+                        }
+                    } else {
+                        preferences.setScheduleEnabled(true)
+                    }
+                },
+                modifier = Modifier.testTag("schedule_enabled_switch"),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AegisOnPrimaryWhite,
+                    checkedTrackColor = AegisPurple,
+                    uncheckedThumbColor = AegisTextMuted,
+                    uncheckedTrackColor = AegisCardBorder
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isActiveNow) "Active right now • Quiet hours enforcement" else if (scheduleEnabled) "Standby until next window" else "Reminder window disabled",
+                color = AegisTextSecondary,
+                fontSize = 11.sp,
+                fontFamily = ClassicalBodyFont,
+                modifier = Modifier.weight(1f)
+            )
+            StatusPill(
+                label = when {
+                    isActiveNow -> "ACTIVE NOW"
+                    scheduleEnabled -> "ARMED"
+                    else -> "OFF"
+                },
+                isActive = isActiveNow,
+                activeColor = AegisPrimaryCyan,
+                inactiveColor = if (scheduleEnabled) AegisPurple else AegisTextMuted
+            )
+        }
+
+        HorizontalDivider(
+            color = AegisLavenderBorder.copy(alpha = 0.6f),
+            modifier = Modifier.padding(vertical = 12.dp)
+        )
+
+        Text(
+            text = "Quick Guard Presets",
+            color = AegisTextPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = ClassicalBodyFont
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val presets = listOf(
+            Triple("Night 9P–7A", 21 * 60, 7 * 60),
+            Triple("Sleep 10P–6A", 22 * 60, 6 * 60),
+            Triple("Study 2P–6P", 14 * 60, 18 * 60)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            presets.forEach { (label, pStart, pEnd) ->
+                val isSelected = startMinutes == pStart && endMinutes == pEnd
+                OutlinedButton(
+                    onClick = {
+                        preferences.setScheduleWindow(pStart, pEnd)
+                        if (!scheduleEnabled) preferences.setScheduleEnabled(true)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (isSelected) AegisPurple else AegisCardBackground,
+                        contentColor = if (isSelected) AegisOnPrimaryWhite else AegisTextPrimary
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ScheduleHourStepper(
+                label = "Start Time",
+                minuteOfDay = startMinutes,
+                onMinusHour = {
+                    val next = (startMinutes - 60 + 1440) % 1440
+                    preferences.setScheduleWindow(next, endMinutes)
+                },
+                onPlusHour = {
+                    val next = (startMinutes + 60) % 1440
+                    preferences.setScheduleWindow(next, endMinutes)
+                },
+                modifier = Modifier.weight(1f)
+            )
+            ScheduleHourStepper(
+                label = "End Time",
+                minuteOfDay = endMinutes,
+                onMinusHour = {
+                    val next = (endMinutes - 60 + 1440) % 1440
+                    preferences.setScheduleWindow(startMinutes, next)
+                },
+                onPlusHour = {
+                    val next = (endMinutes + 60) % 1440
+                    preferences.setScheduleWindow(startMinutes, next)
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScheduleHourStepper(
+    label: String,
+    minuteOfDay: Int,
+    onMinusHour: () -> Unit,
+    onPlusHour: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(AegisSurfaceElevated)
+            .border(1.dp, AegisLavenderBorder, RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            color = AegisTextMuted,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = ClassicalBodyFont
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = AegisPreferences.formatClockTime(minuteOfDay),
+            color = AegisTextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = ClassicalDisplayFont
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            OutlinedButton(
+                onClick = onMinusHour,
+                contentPadding = PaddingValues(0.dp),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Text("-1h", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = onPlusHour,
+                contentPadding = PaddingValues(0.dp),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Text("+1h", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+

@@ -166,6 +166,52 @@ class AegisPreferences(context: Context) {
         return _whitelistedPackages.value.contains(packageName)
     }
 
+    // Scheduled Active Protection Hours ("Study / Bedtime Guard")
+    private val _scheduleEnabled = MutableStateFlow(prefs.getBoolean(KEY_SCHEDULE_ENABLED, false))
+    val scheduleEnabled: StateFlow<Boolean> = _scheduleEnabled.asStateFlow()
+
+    private val _scheduleStartMinutes = MutableStateFlow(
+        prefs.getInt(KEY_SCHEDULE_START_MINUTES, 21 * 60).coerceIn(0, 1439)
+    )
+    val scheduleStartMinutes: StateFlow<Int> = _scheduleStartMinutes.asStateFlow()
+
+    private val _scheduleEndMinutes = MutableStateFlow(
+        prefs.getInt(KEY_SCHEDULE_END_MINUTES, 7 * 60).coerceIn(0, 1439)
+    )
+    val scheduleEndMinutes: StateFlow<Int> = _scheduleEndMinutes.asStateFlow()
+
+    fun setScheduleEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SCHEDULE_ENABLED, enabled).apply()
+        _scheduleEnabled.value = enabled
+    }
+
+    fun setScheduleWindow(startMinutes: Int, endMinutes: Int) {
+        val safeStart = startMinutes.coerceIn(0, 1439)
+        val safeEnd = endMinutes.coerceIn(0, 1439)
+        prefs.edit()
+            .putInt(KEY_SCHEDULE_START_MINUTES, safeStart)
+            .putInt(KEY_SCHEDULE_END_MINUTES, safeEnd)
+            .apply()
+        _scheduleStartMinutes.value = safeStart
+        _scheduleEndMinutes.value = safeEnd
+    }
+
+    fun isWithinScheduledWindow(
+        currentMinuteOfDay: Int = currentClockMinuteOfDay()
+    ): Boolean {
+        if (!_scheduleEnabled.value) return false
+        return isMinuteWithinWindow(
+            minuteOfDay = currentMinuteOfDay,
+            startMinute = _scheduleStartMinutes.value,
+            endMinute = _scheduleEndMinutes.value
+        )
+    }
+
+    private fun currentClockMinuteOfDay(): Int {
+        val cal = java.util.Calendar.getInstance()
+        return cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+    }
+
     private val _customThresholdsEnabled = MutableStateFlow(prefs.getBoolean(KEY_CUSTOM_THRESHOLDS_ENABLED, false))
     val customThresholdsEnabled: StateFlow<Boolean> = _customThresholdsEnabled.asStateFlow()
 
@@ -627,6 +673,30 @@ class AegisPreferences(context: Context) {
             }
         }
 
+        fun isMinuteWithinWindow(minuteOfDay: Int, startMinute: Int, endMinute: Int): Boolean {
+            val m = minuteOfDay.coerceIn(0, 1439)
+            val s = startMinute.coerceIn(0, 1439)
+            val e = endMinute.coerceIn(0, 1439)
+            return if (s <= e) {
+                m in s..e
+            } else {
+                m >= s || m <= e
+            }
+        }
+
+        fun formatClockTime(minuteOfDay: Int): String {
+            val safe = ((minuteOfDay % 1440) + 1440) % 1440
+            val hour24 = safe / 60
+            val min = safe % 60
+            val amPm = if (hour24 < 12) "AM" else "PM"
+            val hour12 = when {
+                hour24 == 0 -> 12
+                hour24 > 12 -> hour24 - 12
+                else -> hour24
+            }
+            return String.format(java.util.Locale.US, "%d:%02d %s", hour12, min, amPm)
+        }
+
         private const val KEY_SENSITIVITY = "key_sensitivity"
         private const val KEY_STRICT_EVERYTHING = "key_strict_everything"
         private const val KEY_AUTO_START = "key_auto_start"
@@ -665,5 +735,8 @@ class AegisPreferences(context: Context) {
         private const val KEY_EVICT_APP_ON_THREAT = "key_evict_app_on_threat"
         private const val KEY_GUARDIAN_WINDOW_MINUTES = "key_guardian_window_minutes"
         private const val KEY_WHITELISTED_PACKAGES = "key_whitelisted_packages"
+        private const val KEY_SCHEDULE_ENABLED = "key_schedule_enabled"
+        private const val KEY_SCHEDULE_START_MINUTES = "key_schedule_start_minutes"
+        private const val KEY_SCHEDULE_END_MINUTES = "key_schedule_end_minutes"
     }
 }
