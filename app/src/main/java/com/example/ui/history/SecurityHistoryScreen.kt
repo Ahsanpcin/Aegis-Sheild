@@ -1,6 +1,7 @@
 package com.example.ui.history
 
 import android.content.Intent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AppBlocking
@@ -32,7 +34,6 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -48,13 +49,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.SecurityIncident
@@ -65,10 +70,7 @@ import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
-import com.example.ui.components.MetricTile
-import com.example.ui.components.PeakThreatWindowCard
 import com.example.ui.components.SeverityTag
-import com.example.ui.components.SevenDayThreatChart
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.ThreatCategoryBadge
 import com.example.ui.components.ThreatCategoryDistributionCard
@@ -79,9 +81,11 @@ import com.example.ui.theme.AegisChampagneGold
 import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisGoldBorder
-import com.example.ui.theme.AegisGoldBright
+import com.example.ui.theme.AegisGoldDeepTint
 import com.example.ui.theme.AegisLavenderBorder
+import com.example.ui.theme.AegisLavenderLight
 import com.example.ui.theme.AegisLavenderSoft
+import com.example.ui.theme.AegisLavenderSurface
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
@@ -143,7 +147,6 @@ fun SecurityHistoryScreen(
             topBar = {
                 CyberTopBar(
                     title = "Progress",
-                    subtitle = "Threat Analytics & Protection Ledger",
                     actions = {
                         IconButton(
                             onClick = {
@@ -196,58 +199,75 @@ fun SecurityHistoryScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                contentPadding = PaddingValues(top = 8.dp, bottom = 22.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 1. 7-Day Threat Trend Chart
+                // 1. Threat Category Distribution Overview
                 item {
-                    LuxurySectionHeader(title = "Threat Analytics", accentColor = AegisPurple)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SevenDayThreatChart(weeklyTrend = analytics.weeklyTrend)
-                }
-
-                // 2. Threat Category Distribution
-                item {
+                    LuxurySectionHeader(title = "Threat Overview", accentColor = AegisPurple)
+                    Spacer(modifier = Modifier.height(6.dp))
                     ThreatCategoryDistributionCard(analytics = analytics)
                 }
 
-                // 3. Peak Threat Window & Top Blocked App
-                item {
-                    PeakThreatWindowCard(analytics = analytics)
-                }
-
-                // 4. Protection Ledger Metrics
+                // 2. Sculpted Chamfered-Diamond Protection Ledger Pods
                 item {
                     LuxurySectionHeader(title = "Protection Ledger", accentColor = AegisChampagneGold)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        MetricTile(
+                        SculptedLedgerStatPod(
                             title = "Detections",
                             value = totalDetections.toString(),
+                            caption = "Blocked events",
                             icon = Icons.Default.Security,
                             accentColor = AegisChampagneGold,
-                            caption = "Total blocked events",
+                            gradientColors = listOf(AegisChampagneSoft, AegisGoldDeepTint),
+                            borderColor = AegisGoldBorder,
+                            isLeftChamfer = true,
                             modifier = Modifier.weight(1f)
                         )
 
-                        MetricTile(
+                        SculptedLedgerStatPod(
                             title = "Blocked Apps",
                             value = blockedAppCount.toString(),
+                            caption = "Unique apps",
                             icon = Icons.Default.AppBlocking,
                             accentColor = AegisPurple,
-                            caption = "Unique applications",
+                            gradientColors = listOf(AegisLavenderSoft, AegisLavenderSurface),
+                            borderColor = AegisLavenderBorder,
+                            isLeftChamfer = false,
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
 
+                // 3. Sculpted Arch-Capsule Blocked Applications Card
                 item {
-                    CyberCard(
-                        borderColor = AegisLavenderBorder,
-                        tone = CyberCardTone.LAVENDER
+                    val ledgerCardShape = RoundedCornerShape(
+                        topStart = 28.dp,
+                        topEnd = 14.dp,
+                        bottomStart = 14.dp,
+                        bottomEnd = 28.dp
+                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(
+                                elevation = 7.dp,
+                                shape = ledgerCardShape,
+                                ambientColor = AegisPurple.copy(alpha = 0.16f),
+                                spotColor = AegisPurple.copy(alpha = 0.16f)
+                            )
+                            .clip(ledgerCardShape)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(AegisLavenderSoft, AegisLavenderSurface)
+                                )
+                            )
+                            .border(1.2.dp, AegisLavenderBorder, ledgerCardShape)
+                            .padding(16.dp)
                     ) {
                         Text(
                             text = "Blocked Applications",
@@ -256,70 +276,109 @@ fun SecurityHistoryScreen(
                             fontWeight = FontWeight.Bold,
                             fontFamily = ClassicalDisplayFont
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         if (blockedAppsBreakdown.isEmpty()) {
-                            Text(
-                                text = "No apps blocked yet.",
-                                color = AegisTextMuted,
-                                fontSize = 12.sp,
-                                fontFamily = ClassicalBodyFont
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.65f))
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No apps blocked yet.",
+                                    color = AegisTextMuted,
+                                    fontSize = 12.sp,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                            }
                         } else {
-                            blockedAppsBreakdown.forEachIndexed { index, item ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                        Text(
-                                            text = item.appDisplayName,
-                                            color = AegisTextPrimary,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = ClassicalDisplayFont
-                                        )
-                                        Text(
-                                            text = item.packageName,
-                                            color = AegisTextMuted,
-                                            fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                blockedAppsBreakdown.forEach { item ->
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(50))
+                                            .background(Color.White.copy(alpha = 0.72f))
+                                            .border(1.dp, AegisLavenderBorder.copy(alpha = 0.7f), RoundedCornerShape(50))
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        ThreatCategoryBadge(category = item.latestIncident.category)
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50))
-                                                .background(AegisDangerRed.copy(alpha = 0.12f))
-                                                .border(1.dp, AegisDangerRed.copy(alpha = 0.35f), RoundedCornerShape(50))
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f).padding(end = 8.dp)
                                         ) {
-                                            Text(
-                                                text = "${item.count}×",
-                                                color = AegisDangerRed,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace
-                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        brush = Brush.linearGradient(
+                                                            colors = listOf(AegisPurple, AegisPrimaryCyan)
+                                                        )
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = item.appDisplayName.take(1).uppercase(),
+                                                    color = AegisOnPrimaryWhite,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = item.appDisplayName,
+                                                    color = AegisTextPrimary,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = ClassicalDisplayFont,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = item.packageName,
+                                                    color = AegisTextMuted,
+                                                    fontSize = 10.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            ThreatCategoryBadge(category = item.latestIncident.category)
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(AegisDangerRed.copy(alpha = 0.14f))
+                                                    .border(1.dp, AegisDangerRed.copy(alpha = 0.40f), CircleShape)
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${item.count}×",
+                                                    color = AegisDangerRed,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                if (index < blockedAppsBreakdown.lastIndex) {
-                                    HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
                                 }
                             }
                         }
                     }
                 }
 
-                // 2. Below: Security History Widget
+                // 4. Security History Log
                 item {
                     LuxurySectionHeader(title = "Security History (${incidents.size})")
                 }
@@ -335,11 +394,11 @@ fun SecurityHistoryScreen(
                                 verticalArrangement = Arrangement.Center,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 18.dp)
+                                    .padding(vertical = 14.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(66.dp)
+                                        .size(58.dp)
                                         .clip(CircleShape)
                                         .background(
                                             brush = Brush.linearGradient(
@@ -352,18 +411,18 @@ fun SecurityHistoryScreen(
                                         imageVector = Icons.Default.Shield,
                                         contentDescription = null,
                                         tint = AegisOnPrimaryWhite,
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
                                     text = "No Threats Detected",
                                     color = AegisTextPrimary,
-                                    fontSize = 18.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = ClassicalDisplayFont
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "No incidents recorded yet.",
                                     color = AegisTextMuted,
@@ -430,6 +489,105 @@ fun SecurityHistoryScreen(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SculptedLedgerStatPod(
+    title: String,
+    value: String,
+    caption: String,
+    icon: ImageVector,
+    accentColor: Color,
+    gradientColors: List<Color>,
+    borderColor: Color,
+    isLeftChamfer: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // Distinct chamfered diamond-shield shape for Protection Ledger metrics
+    val podShape = if (isLeftChamfer) {
+        CutCornerShape(topStart = 22.dp, topEnd = 6.dp, bottomStart = 6.dp, bottomEnd = 22.dp)
+    } else {
+        CutCornerShape(topStart = 6.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 6.dp)
+    }
+
+    Box(
+        modifier = modifier
+            .shadow(
+                elevation = 8.dp,
+                shape = podShape,
+                ambientColor = accentColor.copy(alpha = 0.20f),
+                spotColor = accentColor.copy(alpha = 0.20f)
+            )
+            .clip(podShape)
+            .background(brush = Brush.verticalGradient(colors = gradientColors))
+            .border(1.3.dp, borderColor, podShape)
+    ) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val c = if (isLeftChamfer) Offset(size.width * 0.84f, size.height * 0.78f) else Offset(size.width * 0.16f, size.height * 0.78f)
+            drawCircle(
+                color = accentColor.copy(alpha = 0.10f),
+                radius = size.minDimension * 0.42f,
+                center = c
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title.uppercase(),
+                    color = AegisTextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.9.sp,
+                    fontFamily = ClassicalBodyFont,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(accentColor, AegisLavenderLight)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = AegisOnPrimaryWhite,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = value,
+                color = AegisTextPrimary,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = ClassicalDisplayFont
+            )
+
+            Text(
+                text = caption,
+                color = AegisTextMuted,
+                fontSize = 11.sp,
+                fontFamily = ClassicalBodyFont
+            )
         }
     }
 }
@@ -593,4 +751,3 @@ internal fun buildAuditReportText(
         appendLine("- Sensitive Graphic: ${analytics.sensitiveGraphicCount}")
     }.trim()
 }
-

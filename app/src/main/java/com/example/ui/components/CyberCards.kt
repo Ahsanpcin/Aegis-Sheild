@@ -161,41 +161,46 @@ fun CyberCard(
             AegisChampagneGold.copy(alpha = 0.18f)
         )
         CyberCardTone.HERO -> Quad(
-            listOf(AegisCardBackground, AegisLavenderSoft, AegisChampagneSoft.copy(alpha = 0.85f)),
+            listOf(
+                Color(0xFFF6FAFF), // Pearl White-Sky Top
+                Color(0xFFEDF4FF), // Serene Azure Mist
+                Color(0xFFF2EEFF)  // Gentle Lavender Cloud
+            ),
             AegisCardBorder,
-            listOf(AegisPrimaryCyan, AegisPurple, AegisChampagneGold),
-            AegisPurple.copy(alpha = 0.18f)
+            listOf(AegisPrimaryCyan.copy(alpha = 0.55f), AegisPurple.copy(alpha = 0.55f)),
+            AegisPrimaryCyan.copy(alpha = 0.14f)
         )
     }
 
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(24.dp)
     val borderBrush = Brush.linearGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.85f),
-            resolvedBorder
+            Color.White.copy(alpha = 0.94f),
+            resolvedBorder.copy(alpha = 0.65f)
         )
     )
     val cardModifier = modifier
         .fillMaxWidth()
         .shadow(
-            elevation = 8.dp,
+            elevation = if (resolvedTone == CyberCardTone.HERO) 10.dp else 6.dp,
             shape = shape,
             ambientColor = shadowTint,
             spotColor = shadowTint
         )
         .clip(shape)
         .background(brush = Brush.verticalGradient(colors = gradientColors))
-        .border(BorderStroke(1.2.dp, borderBrush), shape)
+        .border(BorderStroke(1.1.dp, borderBrush), shape)
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
 
     Column(modifier = cardModifier) {
-        // Vibrant 3-color style top accent bar
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.5.dp)
-                .background(brush = Brush.horizontalGradient(colors = accentStripeColors))
-        )
+        if (resolvedTone != CyberCardTone.HERO) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .background(brush = Brush.horizontalGradient(colors = accentStripeColors))
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()

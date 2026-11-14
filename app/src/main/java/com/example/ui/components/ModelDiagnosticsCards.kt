@@ -279,7 +279,7 @@ fun ModelManagerCard(
             }
         }
 
-        if (showCloudDownloader) {
+        if (showCloudDownloader && (!telemetry.isModelLoaded || isDownloadingOrUnzipping)) {
             Spacer(modifier = Modifier.height(10.dp))
 
             AnimatedVisibility(visible = isDownloadingOrUnzipping) {
@@ -387,10 +387,6 @@ fun ModelManagerCard(
                 onClick = {
                     if (isDownloadingOrUnzipping) {
                         ModelDownloader.cancelDownload()
-                    } else if (telemetry.isModelLoaded) {
-                        onRequireAuth("download & replace AI model") {
-                            startCloudDownload(1)
-                        }
                     } else {
                         startCloudDownload(1)
                     }
@@ -413,11 +409,7 @@ fun ModelManagerCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = when {
-                        isDownloadingOrUnzipping -> "CANCEL DOWNLOAD"
-                        telemetry.isModelLoaded -> "REFRESH MODEL (LINK 1 • GITHUB)"
-                        else -> "DOWNLOAD AI MODEL (LINK 1)"
-                    },
+                    text = if (isDownloadingOrUnzipping) "CANCEL DOWNLOAD" else "DOWNLOAD AI MODEL (LINK 1)",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = ClassicalBodyFont,
@@ -428,15 +420,7 @@ fun ModelManagerCard(
             if (!isDownloadingOrUnzipping) {
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = {
-                        if (telemetry.isModelLoaded) {
-                            onRequireAuth("download AI model from Link 2") {
-                                startCloudDownload(2)
-                            }
-                        } else {
-                            startCloudDownload(2)
-                        }
-                    },
+                    onClick = { startCloudDownload(2) },
                     enabled = !isImporting,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -486,13 +470,7 @@ fun ModelManagerCard(
                         OutlinedButton(
                             onClick = {
                                 val fallbackLink = if (err.linkIndex == 1) 2 else 1
-                                if (telemetry.isModelLoaded) {
-                                    onRequireAuth("download AI model from Link $fallbackLink") {
-                                        startCloudDownload(fallbackLink)
-                                    }
-                                } else {
-                                    startCloudDownload(fallbackLink)
-                                }
+                                startCloudDownload(fallbackLink)
                             },
                             enabled = !isDownloadingOrUnzipping && !isImporting,
                             shape = RoundedCornerShape(12.dp),
@@ -520,84 +498,99 @@ fun ModelManagerCard(
 
             Spacer(modifier = Modifier.height(10.dp))
         } else {
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = {
-                    if (telemetry.isModelLoaded) {
-                        onRequireAuth("replace AI model") {
+        if (!isDownloadingOrUnzipping) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = {
+                        if (telemetry.isModelLoaded) {
+                            onRequireAuth("load custom AI model") {
+                                onBeforeOpenPicker()
+                                modelPickerLauncher.launch(arrayOf("*/*"))
+                            }
+                        } else {
                             onBeforeOpenPicker()
                             modelPickerLauncher.launch(arrayOf("*/*"))
                         }
-                    } else {
-                        onBeforeOpenPicker()
-                        modelPickerLauncher.launch(arrayOf("*/*"))
-                    }
-                },
-                enabled = !isImporting && !isDownloadingOrUnzipping,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (telemetry.isModelLoaded) AegisPurple else AegisPrimaryCyan,
-                    contentColor = AegisOnPrimaryWhite
-                ),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .testTag("pick_tflite_model_button")
-            ) {
-                if (isImporting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = AegisOnPrimaryWhite,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "VALIDATING...",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = ClassicalBodyFont,
-                        letterSpacing = 0.8.sp
-                    )
-                } else {
-                    Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (telemetry.isModelLoaded) "REPLACE .TFLITE" else "LOAD .TFLITE FROM PHONE",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = ClassicalBodyFont,
-                        letterSpacing = 0.6.sp
-                    )
-                }
-            }
-
-            if (telemetry.isModelLoaded && modelManager.activeModelFile.exists()) {
-                OutlinedButton(
-                    onClick = {
-                        onRequireAuth("remove AI model") {
-                            modelManager.clearImportedModel()
-                            localError = null
-                            ModelDownloader.clearState()
-                            onModelUpdated()
-                        }
                     },
-                    enabled = !isDownloadingOrUnzipping,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = AegisChampagneSoft,
-                        contentColor = AegisWarningAmber
+                    enabled = !isImporting,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (telemetry.isModelLoaded) AegisPurple else AegisPrimaryCyan,
+                        contentColor = AegisOnPrimaryWhite
                     ),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
+                        .weight(1f)
                         .height(48.dp)
-                        .testTag("remove_tflite_model_button")
+                        .testTag("pick_tflite_model_button")
                 ) {
-                    Icon(imageVector = Icons.Default.DeleteOutline, contentDescription = "Remove model", modifier = Modifier.size(18.dp))
+                    if (isImporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = AegisOnPrimaryWhite,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "VALIDATING...",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalBodyFont,
+                            letterSpacing = 0.8.sp
+                        )
+                    } else {
+                        Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (telemetry.isModelLoaded) "CUSTOM" else "LOAD .TFLITE FROM PHONE",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalBodyFont,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
+                }
+
+                if (telemetry.isModelLoaded) {
+                    OutlinedButton(
+                        onClick = {
+                            onRequireAuth("remove AI model") {
+                                modelManager.clearImportedModel()
+                                localError = null
+                                ModelDownloader.clearState()
+                                onModelUpdated()
+                            }
+                        },
+                        enabled = !isImporting,
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = AegisChampagneSoft,
+                            contentColor = AegisWarningAmber
+                        ),
+                        modifier = Modifier
+                            .height(48.dp)
+                            .testTag("remove_tflite_model_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Delete model",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Del",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalBodyFont
+                        )
+                    }
                 }
             }
         }

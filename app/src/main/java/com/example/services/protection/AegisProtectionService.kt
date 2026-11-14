@@ -32,6 +32,7 @@ import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.core.models.SecurityIncident
+import com.example.core.update.UpdateChecker
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.detection.classifier.ClassificationResult
@@ -126,6 +127,11 @@ class AegisProtectionService : Service() {
                     isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                         status == BatteryManager.BATTERY_STATUS_FULL
                     syncPowerStateToRepo()
+                    UpdateChecker.onBatteryStateChanged(
+                        context = this@AegisProtectionService,
+                        batteryPercent = batteryPercent,
+                        isCharging = isCharging
+                    )
                 }
                 PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                     isPowerSaveMode = powerManager?.isPowerSaveMode == true
@@ -162,6 +168,11 @@ class AegisProtectionService : Service() {
         isCharging = charging
         registerPowerReceiver()
         syncPowerStateToRepo()
+        UpdateChecker.onBatteryStateChanged(
+            context = this,
+            batteryPercent = batteryPercent,
+            isCharging = isCharging
+        )
 
         container.refreshModelTelemetry()
         container.protectionRepository.setServiceRunning(true)

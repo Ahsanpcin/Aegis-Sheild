@@ -41,9 +41,17 @@ class AegisBackgroundDownloadService : Service() {
                 val progressPct = intent?.getIntExtra(EXTRA_PROGRESS, -1) ?: -1
                 val notification = buildNotification(title, subtitle, progressPct)
                 promoteToForeground(notification)
+                return START_REDELIVER_INTENT
             }
         }
         return START_NOT_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        if (UpdateChecker.hasIncompletePersistedDownload(applicationContext)) {
+            AegisUpdateResumeJobService.schedule(applicationContext)
+        }
     }
 
     private fun promoteToForeground(notification: Notification) {

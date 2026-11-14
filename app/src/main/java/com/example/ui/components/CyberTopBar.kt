@@ -79,9 +79,9 @@ fun CyberTopBar(
             .background(
                 brush = Brush.horizontalGradient(
                     colors = listOf(
-                        AegisSecondaryBackground,
-                        AegisLavenderSoft,
-                        AegisCardBackground
+                        Color(0xFFE7F0FF),
+                        Color(0xFFEEE9FF),
+                        Color(0xFFF3F8FF)
                     )
                 )
             )
@@ -176,17 +176,17 @@ fun CyberTopBar(
             )
         }
 
-        // Crisp 3-color gradient divider
+        // Delicate frosted hairline divider
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(2.dp)
+                .height(1.dp)
                 .background(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
-                            AegisPrimaryCyan.copy(alpha = 0.78f),
-                            AegisPurple.copy(alpha = 0.72f),
-                            AegisChampagneGold.copy(alpha = 0.88f)
+                            AegisPrimaryCyan.copy(alpha = 0.22f),
+                            AegisPurple.copy(alpha = 0.22f),
+                            Color.White.copy(alpha = 0.72f)
                         )
                     )
                 )

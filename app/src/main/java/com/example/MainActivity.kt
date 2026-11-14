@@ -45,8 +45,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Silently check latest GitHub release vs current app version on startup
-        UpdateChecker.startCheckForUpdates(showUpToDatePopup = false)
+        // Silently check latest GitHub release vs current app version on startup & pre-download at 100 KB/s
+        UpdateChecker.startCheckForUpdates(this, showUpToDatePopup = false)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)

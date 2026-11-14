@@ -1083,5 +1083,103 @@ class ExampleRobolectricTest {
         val telemetry = EngineTelemetry(framesProcessedCount = 30L, framesSkippedCount = 70L)
         assertEquals(70, telemetry.ecoSavedPercent())
     }
+
+    @Test
+    fun `silent background preload throttle paces 100 KBps and turbo mode bypasses cap`() {
+        // At 100 KB/s (102,400 B/s), transferring 102,400 bytes in 600ms requires ~400ms throttle delay
+        val delayMs = UpdateChecker.computeThrottleDelayMs(
+            bytesInWindow = UpdateChecker.THROTTLED_PRELOAD_BPS,
+            elapsedMs = 600L,
+            limitBps = UpdateChecker.THROTTLED_PRELOAD_BPS
+        )
+        assertEquals(400L, delayMs)
+
+        // When elapsed time already equals/exceeds target pacing window, delay is 0ms
+        val zeroDelayMs = UpdateChecker.computeThrottleDelayMs(
+            bytesInWindow = 51_200L,
+            elapsedMs = 550L,
+            limitBps = UpdateChecker.THROTTLED_PRELOAD_BPS
+        )
+        assertEquals(0L, zeroDelayMs)
+
+        // Turbo mode (unlimited) always returns 0ms delay immediately
+        val turboDelayMs = UpdateChecker.computeThrottleDelayMs(
+            bytesInWindow = 10_000_000L,
+            elapsedMs = 50L,
+            limitBps = UpdateChecker.TURBO_UNLIMITED_BPS
+        )
+        assertEquals(0L, turboDelayMs)
+    }
+
+    @Test
+    fun `silent preload battery eligibility enforces above 20 percent or charging`() {
+        assertFalse(UpdateChecker.isBatteryEligibleForSilentPreload(batteryPercent = 20, isCharging = false))
+        assertFalse(UpdateChecker.isBatteryEligibleForSilentPreload(batteryPercent = 12, isCharging = false))
+        assertTrue(UpdateChecker.isBatteryEligibleForSilentPreload(batteryPercent = 21, isCharging = false))
+        assertTrue(UpdateChecker.isBatteryEligibleForSilentPreload(batteryPercent = 10, isCharging = true))
+    }
+
+    @Test
+    fun `http range total bytes and sha256 verification validate intact apks and reject corruption`() {
+        // Content-Range parsing for resumable transfers
+        assertEquals(
+            18_500_000L,
+            UpdateChecker.resolveTotalBytes(
+                contentRangeHeader = "bytes 1048576-18499999/18500000",
+                bodyContentLength = 17_451_424L,
+                existingOffset = 1_048_576L,
+                fallbackExpected = 0L
+            )
+        )
+
+        // SHA-256 extraction from release notes or GitHub digest field
+        val sampleSha = "a".repeat(64)
+        assertEquals(sampleSha, UpdateChecker.extractSha256FromText("Automated build\nAPK_SHA256=$sampleSha\nSigned"))
+        assertEquals(sampleSha, UpdateChecker.extractSha256FromText("sha256:$sampleSha"))
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tempApk = File(context.cacheDir, "test_integrity_apk.apk")
+        if (tempApk.exists()) tempApk.delete()
+
+        val payload = ByteArray(16 * 1024) { (it * 7 % 251).toByte() }
+        tempApk.writeBytes(payload)
+
+        val actualSha = UpdateChecker.computeSha256Hex(tempApk)
+        val valid = UpdateChecker.verifyApkFileAndHash(
+            apkFile = tempApk,
+            expectedTotalBytes = payload.size.toLong(),
+            expectedSha256 = actualSha
+        )
+        assertTrue(valid.isValid)
+        assertEquals(actualSha, valid.computedSha256)
+
+        val wrongHash = UpdateChecker.verifyApkFileAndHash(
+            apkFile = tempApk,
+            expectedTotalBytes = payload.size.toLong(),
+            expectedSha256 = "f".repeat(64)
+        )
+        assertFalse(wrongHash.isValid)
+
+        val wrongSize = UpdateChecker.verifyApkFileAndHash(
+            apkFile = tempApk,
+            expectedTotalBytes = payload.size.toLong() + 100L,
+            expectedSha256 = actualSha
+        )
+        assertFalse(wrongSize.isValid)
+
+        tempApk.delete()
+    }
+
+    @Test
+    fun `signing cert comparison detects conflicts and home banner hides cleanly on tap`() {
+        val certA = setOf("99e4cbc4f6043190f166d6c78b71adce6f7ecb2fb32feb3e957c25203aa9beaf")
+        val certB = setOf("11223344556677889900aabbccddeeff00112233445566778899aabbccddeeff")
+
+        assertTrue(UpdateChecker.haveCompatibleSigningCerts(certA, certA))
+        assertFalse(UpdateChecker.haveCompatibleSigningCerts(certA, certB))
+
+        UpdateChecker.hideHomeUpdateBanner()
+        assertTrue(UpdateChecker.homeBannerHidden.value)
+    }
 }
 

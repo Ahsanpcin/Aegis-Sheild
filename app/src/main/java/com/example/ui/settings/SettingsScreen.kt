@@ -1,9 +1,14 @@
 package com.example.ui.settings
 
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,36 +22,44 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +72,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -67,11 +82,13 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.SensitivityLevel
@@ -97,12 +114,10 @@ import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisGoldBorder
 import com.example.ui.theme.AegisGoldBright
 import com.example.ui.theme.AegisLavenderBorder
-import com.example.ui.theme.AegisLavenderLight
 import com.example.ui.theme.AegisLavenderSoft
 import com.example.ui.theme.AegisOnPrimaryWhite
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
-import com.example.ui.theme.AegisSuccessGreen
 import com.example.ui.theme.AegisSurfaceElevated
 import com.example.ui.theme.AegisTextMuted
 import com.example.ui.theme.AegisTextPrimary
@@ -110,6 +125,35 @@ import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+private data class InstalledAppEntry(
+    val packageName: String,
+    val label: String,
+    val icon: ImageBitmap?
+)
+
+private fun drawableToScaledBitmap(drawable: Drawable, sizePx: Int = 72): ImageBitmap? {
+    return try {
+        val raw = if (drawable is BitmapDrawable && drawable.bitmap != null) {
+            drawable.bitmap
+        } else {
+            val bmp = Bitmap.createBitmap(
+                drawable.intrinsicWidth.coerceAtLeast(1),
+                drawable.intrinsicHeight.coerceAtLeast(1),
+                Bitmap.Config.ARGB_8888
+            )
+            val canvas = Canvas(bmp)
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            drawable.draw(canvas)
+            bmp
+        }
+        Bitmap.createScaledBitmap(raw, sizePx, sizePx, true).asImageBitmap()
+    } catch (_: Exception) {
+        null
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -126,7 +170,6 @@ fun SettingsScreen(
     val hasPin by preferences.hasGuardianPin.collectAsState()
     val isMaintenanceMode by preferences.maintenanceMode.collectAsState()
     val lockdownDurationMinutes by preferences.lockdownDurationMinutes.collectAsState()
-    val doubleTimeMultiplier by preferences.doubleTimeMultiplier.collectAsState()
     val waitCooldownBeforePin by preferences.waitCooldownBeforePassword.collectAsState()
     val antiTamperEnabled by preferences.antiTamperEnabled.collectAsState()
     val powerMode by preferences.powerMode.collectAsState()
@@ -137,9 +180,6 @@ fun SettingsScreen(
     val autoThrottleLowBattery by preferences.autoThrottleLowBattery.collectAsState()
 
     val stage1DurationLabel = AegisPreferences.formatMinutesLabel(lockdownDurationMinutes)
-    val doubleDurationLabel = AegisPreferences.formatMinutesLabel(
-        (lockdownDurationMinutes * doubleTimeMultiplier).toInt().coerceAtLeast(1)
-    )
 
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
@@ -153,10 +193,7 @@ fun SettingsScreen(
         Scaffold(
             contentWindowInsets = WindowInsets.statusBars,
             topBar = {
-                CyberTopBar(
-                    title = "Edits",
-                    subtitle = "Model, Guardian & Thresholds"
-                )
+                CyberTopBar(title = "Edits")
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
@@ -165,13 +202,13 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                contentPadding = PaddingValues(top = 8.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp)
             ) {
-                // 1. Load / Change AI Model Widget (Top)
+                // 1. AI Model Engine
                 item {
-                    LuxurySectionHeader(title = "Load / Change AI", accentColor = AegisPurple)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    LuxurySectionHeader(title = "AI Model", accentColor = AegisPurple)
+                    Spacer(modifier = Modifier.height(6.dp))
                     ModelManagerCard(
                         telemetry = telemetry,
                         modelManager = modelManager,
@@ -185,10 +222,10 @@ fun SettingsScreen(
                     )
                 }
 
-                // 2. Battery Saver & Smart Eco Mode Widget
+                // 2. Compact Power Mode & Battery Controls
                 item {
-                    LuxurySectionHeader(title = "Battery Saver & Power Mode", accentColor = AegisPrimaryCyan)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    LuxurySectionHeader(title = "Power Mode", accentColor = AegisPrimaryCyan)
+                    Spacer(modifier = Modifier.height(6.dp))
                     CyberCard(
                         borderColor = if (telemetry.isLowBatteryThrottled) AegisGoldBorder else AegisCardBorder,
                         tone = if (telemetry.isLowBatteryThrottled) CyberCardTone.GOLD else CyberCardTone.SKY,
@@ -199,40 +236,28 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                Text(
-                                    text = "Shield Battery Mode",
-                                    color = AegisTextPrimary,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalDisplayFont
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = powerMode.caption,
-                                    color = AegisPrimaryCyan,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = ClassicalBodyFont
+                            Text(
+                                text = powerMode.displayName,
+                                color = AegisTextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = ClassicalDisplayFont
+                            )
+                            if (telemetry.isLowBatteryThrottled) {
+                                StatusPill(
+                                    label = "THROTTLED",
+                                    isActive = false,
+                                    activeColor = AegisPrimaryCyan,
+                                    inactiveColor = AegisChampagneGold
                                 )
                             }
-                            StatusPill(
-                                label = when {
-                                    telemetry.isLowBatteryThrottled -> "<20% THROTTLED"
-                                    telemetry.isCharging -> "CHARGING ${telemetry.batteryPercent}%"
-                                    else -> "BATT ${telemetry.batteryPercent}%"
-                                },
-                                isActive = !telemetry.isLowBatteryThrottled,
-                                activeColor = AegisPrimaryCyan,
-                                inactiveColor = AegisChampagneGold
-                            )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             PowerModeTile(
                                 mode = PowerMode.ADAPTIVE_ECO,
@@ -255,10 +280,10 @@ fun SettingsScreen(
                                     .testTag("power_mode_power_saving")
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             PowerModeTile(
                                 mode = PowerMode.BALANCED,
@@ -283,54 +308,36 @@ fun SettingsScreen(
                         }
 
                         HorizontalDivider(
-                            color = AegisCardBorder.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 12.dp)
+                            color = AegisCardBorder.copy(alpha = 0.55f),
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
 
-                        Text(
-                            text = "Battery-Saving Controls",
-                            color = AegisTextPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalDisplayFont
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        PowerOptionSwitchRow(
-                            title = "Auto-Throttle Below 20% Battery",
-                            subtitle = "Automatically slow scans when battery is low & unplugged",
+                        CompactSwitchRow(
+                            title = "Auto-Throttle (<20% Battery)",
                             checked = autoThrottleLowBattery,
                             onCheckedChange = { preferences.setAutoThrottleLowBattery(it) },
                             testTag = "power_opt_low_battery_throttle"
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PowerOptionSwitchRow(
-                            title = "Smart Adaptive Idle Backoff",
-                            subtitle = "Fast on app/screen changes, slower on idle reading",
+                        CompactSwitchRow(
+                            title = "Adaptive Idle Backoff",
                             checked = adaptiveCadenceEnabled,
                             onCheckedChange = { preferences.setAdaptiveCadenceEnabled(it) },
                             testTag = "power_opt_adaptive_cadence"
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PowerOptionSwitchRow(
-                            title = "Perceptual Static Frame Skip",
-                            subtitle = "Skip near-identical frames & background noise",
+                        CompactSwitchRow(
+                            title = "Skip Static Frames",
                             checked = skipDuplicateFrames,
                             onCheckedChange = { preferences.setSkipDuplicateFrames(it) },
                             testTag = "power_opt_skip_duplicates"
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PowerOptionSwitchRow(
+                        CompactSwitchRow(
                             title = "Compact Capture (256px)",
-                            subtitle = "Matches AI tensor size to slash GPU & RAM energy",
                             checked = captureWidthPx <= 320,
                             onCheckedChange = { preferences.setCompactPowerResolution(it) },
                             testTag = "power_opt_compact_capture"
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PowerOptionSwitchRow(
-                            title = "Pause While Screen Off",
-                            subtitle = "Zero-CPU sleep while display is locked",
+                        CompactSwitchRow(
+                            title = "Pause on Screen Off",
                             checked = pauseWhenScreenOff,
                             onCheckedChange = { preferences.setPauseWhenScreenOff(it) },
                             testTag = "power_opt_pause_screen_off"
@@ -338,12 +345,12 @@ fun SettingsScreen(
                     }
                 }
 
-                // App Whitelisting & Exclusion Rules
+                // 3. Excluded Apps (Tap to pick installed apps)
                 item {
                     WhitelistedAppsSection(preferences = preferences)
                 }
 
-                // Scheduled Active Protection Hours ("Bedtime / Study Guard")
+                // 4. Compact Scheduled Guard
                 item {
                     ScheduledProtectionSection(
                         preferences = preferences,
@@ -351,10 +358,10 @@ fun SettingsScreen(
                     )
                 }
 
-                // 2. PIN Change of Guardian
+                // 5. Compact Guardian PIN
                 item {
                     LuxurySectionHeader(title = "Guardian PIN", accentColor = AegisChampagneGold)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     CyberCard(
                         borderColor = AegisGoldBorder,
                         tone = CyberCardTone.GOLD
@@ -367,8 +374,8 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .size(34.dp)
+                                        .clip(RoundedCornerShape(10.dp))
                                         .background(
                                             brush = Brush.linearGradient(
                                                 colors = listOf(AegisChampagneGold, AegisGoldBright)
@@ -376,21 +383,21 @@ fun SettingsScreen(
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisOnPrimaryWhite, modifier = Modifier.size(19.dp))
+                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AegisOnPrimaryWhite, modifier = Modifier.size(17.dp))
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
                                         text = "Guardian PIN",
                                         color = AegisTextPrimary,
-                                        fontSize = 15.sp,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = ClassicalDisplayFont
                                     )
                                     Text(
-                                        text = if (hasPin) "Active • Locks app & admin" else "Not configured",
+                                        text = if (hasPin) "Active" else "Not set",
                                         color = if (hasPin) AegisPrimaryCyan else AegisWarningAmber,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         fontFamily = ClassicalBodyFont
                                     )
@@ -411,7 +418,9 @@ fun SettingsScreen(
                                     contentColor = AegisOnPrimaryWhite
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.testTag("guardian_pin_change_button")
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .testTag("guardian_pin_change_button")
                             ) {
                                 Text(
                                     text = if (hasPin) "CHANGE" else "SETUP",
@@ -424,144 +433,110 @@ fun SettingsScreen(
                     }
                 }
 
-                // 3. Thresholds
+                // 6. Compact Thresholds
                 item {
                     LuxurySectionHeader(title = "Thresholds", accentColor = AegisPrimaryCyan)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     CyberCard(borderColor = AegisCardBorder, tone = CyberCardTone.SKY) {
                         Text(
-                            text = "Detection Sensitivity",
+                            text = "Sensitivity",
                             color = AegisTextPrimary,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = ClassicalDisplayFont
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             SensitivityLevel.entries.forEach { level ->
                                 val isSelected = (sensitivity == level)
+                                val shortTitle = when (level) {
+                                    SensitivityLevel.STRICT -> "Strict"
+                                    SensitivityLevel.BALANCED -> "Balanced"
+                                    SensitivityLevel.PERMISSIVE -> "Permissive"
+                                }
                                 val levelAccent = when (level) {
                                     SensitivityLevel.PERMISSIVE -> AegisPrimaryCyan
                                     SensitivityLevel.BALANCED -> AegisPurple
                                     SensitivityLevel.STRICT -> AegisChampagneGold
                                 }
-                                val selectedFill = when (level) {
-                                    SensitivityLevel.PERMISSIVE -> AegisSurfaceElevated
-                                    SensitivityLevel.BALANCED -> AegisLavenderSoft
-                                    SensitivityLevel.STRICT -> AegisChampagneSoft
-                                }
-                                val shortCaption = when (level) {
-                                    SensitivityLevel.PERMISSIVE -> "Blocks explicit content only"
-                                    SensitivityLevel.BALANCED -> "Explicit + high-confidence suggestive"
-                                    SensitivityLevel.STRICT -> "Strictest block threshold"
-                                }
-                                Row(
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(if (isSelected) selectedFill else AegisCardBackground.copy(alpha = 0.72f))
+                                        .weight(1f)
+                                        .height(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) levelAccent else AegisCardBackground.copy(alpha = 0.8f))
                                         .border(
-                                            if (isSelected) 1.5.dp else 1.dp,
-                                            if (isSelected) levelAccent else AegisCardBorder,
-                                            RoundedCornerShape(14.dp)
+                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                            color = if (isSelected) levelAccent else AegisCardBorder,
+                                            shape = RoundedCornerShape(12.dp)
                                         )
                                         .clickable {
                                             masterKeyGate.request("change sensitivity to ${level.displayName}") {
                                                 preferences.setSensitivity(level)
                                             }
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = isSelected,
-                                        onClick = {
-                                            masterKeyGate.request("change sensitivity to ${level.displayName}") {
-                                                preferences.setSensitivity(level)
-                                            }
                                         },
-                                        colors = RadioButtonDefaults.colors(
-                                            selectedColor = AegisPrimaryCyan,
-                                            unselectedColor = AegisTextMuted
-                                        )
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = shortTitle,
+                                        color = if (isSelected) AegisOnPrimaryWhite else AegisTextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = ClassicalBodyFont,
+                                        maxLines = 1
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text(
-                                            text = level.displayName,
-                                            color = if (isSelected) AegisPrimaryCyan else AegisTextPrimary,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = ClassicalBodyFont
-                                        )
-                                        Text(
-                                            text = shortCaption,
-                                            color = AegisTextMuted,
-                                            fontSize = 11.sp,
-                                            fontFamily = ClassicalBodyFont
-                                        )
-                                    }
                                 }
                             }
                         }
 
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 10.dp))
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.55f), modifier = Modifier.padding(vertical = 8.dp))
 
+                        CompactSwitchRow(
+                            title = "Strict Everything Mode",
+                            checked = isStrictEverything,
+                            onCheckedChange = { enabled ->
+                                masterKeyGate.request("${if (enabled) "enable" else "disable"} Strict Everything") {
+                                    preferences.setStrictEverything(enabled)
+                                }
+                            },
+                            testTag = "strict_everything_switch"
+                        )
+                    }
+                }
+
+                // 7. Compact Resistance
+                item {
+                    LuxurySectionHeader(title = "Resistance", accentColor = AegisChampagneGold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    CyberCard(borderColor = AegisGoldBorder, tone = CyberCardTone.GOLD) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Strict Everything Policy",
-                                    color = AegisTextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "Block immediately on first match",
-                                    color = AegisTextMuted,
-                                    fontSize = 11.sp,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                            }
-                            Switch(
-                                checked = isStrictEverything,
-                                onCheckedChange = { enabled ->
-                                    masterKeyGate.request("${if (enabled) "enable" else "disable"} Strict Everything") {
-                                        preferences.setStrictEverything(enabled)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisPrimaryCyan,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = AegisCardBorder
-                                )
+                            Text(
+                                text = "Lockdown Penalty",
+                                color = AegisTextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = ClassicalDisplayFont
+                            )
+                            Text(
+                                text = stage1DurationLabel,
+                                color = AegisWarningAmber,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
-                    }
-                }
-
-                // 4. Resistance
-                item {
-                    LuxurySectionHeader(title = "Resistance", accentColor = AegisChampagneGold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CyberCard(borderColor = AegisGoldBorder, tone = CyberCardTone.GOLD) {
-                        Text(
-                            text = "Lockdown Penalty: $stage1DurationLabel",
-                            color = AegisWarningAmber,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalDisplayFont
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             listOf(1, 4, 10, 24).forEach { hrs ->
                                 val selected = (lockdownDurationMinutes == hrs * 60)
@@ -571,174 +546,68 @@ fun SettingsScreen(
                                             preferences.setLockdownHours(hrs)
                                         }
                                     },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(0.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         containerColor = if (selected) AegisChampagneGold else AegisCardBackground,
                                         contentColor = if (selected) AegisOnPrimaryWhite else AegisTextPrimary
                                     ),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(42.dp)
+                                        .height(48.dp)
                                 ) {
-                                    Text("${hrs}H", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
+                                    Text("${hrs}H", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
                                 }
                             }
                         }
 
-                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
+                        HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.55f), modifier = Modifier.padding(vertical = 8.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Cooldown Before Master Code",
-                                    color = AegisTextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "$stage1DurationLabel wait • $doubleDurationLabel double-time",
-                                    color = AegisTextMuted,
-                                    fontSize = 11.sp,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                            }
-                            Switch(
-                                checked = waitCooldownBeforePin,
-                                onCheckedChange = { enabled ->
-                                    masterKeyGate.request("change cooldown policy") {
-                                        preferences.setWaitCooldownBeforePassword(enabled)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisPrimaryCyan,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = AegisCardBorder
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Settings & Admin Anti-Tamper",
-                                    color = AegisTextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "Lock Admin, Accessibility & Time",
-                                    color = AegisTextMuted,
-                                    fontSize = 11.sp,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                            }
-                            Switch(
-                                checked = antiTamperEnabled,
-                                onCheckedChange = { enabled ->
-                                    masterKeyGate.request("change anti-tamper policy") {
-                                        preferences.setAntiTamperEnabled(enabled)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisPrimaryCyan,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = AegisCardBorder
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Auto-Start on Boot",
-                                    color = AegisTextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "Arm Shield after device reboot",
-                                    color = AegisTextMuted,
-                                    fontSize = 11.sp,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                            }
-                            Switch(
-                                checked = isAutoStart,
-                                onCheckedChange = { enabled ->
-                                    masterKeyGate.request("change boot auto-start") {
-                                        preferences.setAutoStart(enabled)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisPrimaryCyan,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = AegisCardBorder
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = "Maintenance Mode",
-                                    color = AegisDangerRed,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                                Text(
-                                    text = "Temporarily pause visual blocking",
-                                    color = AegisTextMuted,
-                                    fontSize = 11.sp,
-                                    fontFamily = ClassicalBodyFont
-                                )
-                            }
-                            Switch(
-                                checked = isMaintenanceMode,
-                                onCheckedChange = { isChecked ->
-                                    masterKeyGate.request("${if (isChecked) "enable" else "disable"} Maintenance Mode") {
-                                        preferences.setMaintenanceMode(isChecked)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AegisOnPrimaryWhite,
-                                    checkedTrackColor = AegisDangerRed,
-                                    uncheckedThumbColor = AegisTextMuted,
-                                    uncheckedTrackColor = AegisCardBorder
-                                )
-                            )
-                        }
+                        CompactSwitchRow(
+                            title = "Cooldown Before PIN",
+                            checked = waitCooldownBeforePin,
+                            onCheckedChange = {
+                                masterKeyGate.request("change cooldown policy") {
+                                    preferences.setWaitCooldownBeforePassword(it)
+                                }
+                            },
+                            testTag = "cooldown_before_pin_switch"
+                        )
+                        CompactSwitchRow(
+                            title = "Anti-Tamper Lock",
+                            checked = antiTamperEnabled,
+                            onCheckedChange = {
+                                masterKeyGate.request("change anti-tamper policy") {
+                                    preferences.setAntiTamperEnabled(it)
+                                }
+                            },
+                            testTag = "anti_tamper_switch"
+                        )
+                        CompactSwitchRow(
+                            title = "Auto-Start on Boot",
+                            checked = isAutoStart,
+                            onCheckedChange = {
+                                masterKeyGate.request("change boot auto-start") {
+                                    preferences.setAutoStart(it)
+                                }
+                            },
+                            testTag = "auto_start_boot_switch"
+                        )
+                        CompactSwitchRow(
+                            title = "Maintenance Mode",
+                            checked = isMaintenanceMode,
+                            titleColor = AegisDangerRed,
+                            activeColor = AegisDangerRed,
+                            onCheckedChange = { isChecked ->
+                                masterKeyGate.request("${if (isChecked) "enable" else "disable"} Maintenance Mode") {
+                                    preferences.setMaintenanceMode(isChecked)
+                                }
+                            },
+                            testTag = "maintenance_mode_switch"
+                        )
 
                         if (!isDeviceAdmin) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Button(
                                 onClick = {
                                     preferences.grantTemporarySettingsAuthorization()
@@ -749,16 +618,16 @@ fun SettingsScreen(
                                     containerColor = AegisPrimaryCyan,
                                     contentColor = AegisOnPrimaryWhite
                                 ),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) {
-                                Text("ACTIVATE DEVICE ADMIN", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
+                                Text("ACTIVATE DEVICE ADMIN", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = ClassicalBodyFont)
                             }
                         }
                     }
                 }
 
-                // 5. 7-Tap Secret Advanced Precision Lab (when unlocked)
+                // 8. 7-Tap Secret Advanced Precision Lab (when unlocked)
                 item {
                     AdvancedPrecisionLabSection(preferences = preferences)
                 }
@@ -935,91 +804,87 @@ private fun PowerModeTile(
 ) {
     val containerFill by animateColorAsState(
         targetValue = if (selected) accentColor else AegisCardBackground.copy(alpha = 0.85f),
-        animationSpec = tween(durationMillis = 280),
+        animationSpec = tween(durationMillis = 260),
         label = "PowerModeFill"
     )
     val borderColor by animateColorAsState(
         targetValue = if (selected) accentColor else AegisCardBorder,
-        animationSpec = tween(durationMillis = 280),
+        animationSpec = tween(durationMillis = 260),
         label = "PowerModeBorder"
     )
     val contentTint = if (selected) AegisOnPrimaryWhite else accentColor
     val titleColor = if (selected) AegisOnPrimaryWhite else AegisTextPrimary
-    val subColor = if (selected) AegisOnPrimaryWhite.copy(alpha = 0.90f) else AegisTextMuted
+    val subColor = if (selected) AegisOnPrimaryWhite.copy(alpha = 0.88f) else AegisTextMuted
 
-    Column(
+    Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(containerFill)
-            .border(if (selected) 1.6.dp else 1.dp, borderColor, RoundedCornerShape(14.dp))
+            .border(if (selected) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = mode.displayName,
             tint = contentTint,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(18.dp)
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = mode.displayName,
-            color = titleColor,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = ClassicalDisplayFont,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = "${mode.scanIntervalMs}ms",
-            color = subColor,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = ClassicalBodyFont,
-            textAlign = TextAlign.Center
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = mode.displayName,
+                color = titleColor,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = ClassicalDisplayFont,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${mode.scanIntervalMs}ms",
+                color = subColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
     }
 }
 
 @Composable
-private fun PowerOptionSwitchRow(
+private fun CompactSwitchRow(
     title: String,
-    subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    testTag: String
+    testTag: String,
+    titleColor: Color = AegisTextPrimary,
+    activeColor: Color = AegisPrimaryCyan
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-            Text(
-                text = title,
-                color = AegisTextPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = ClassicalBodyFont
-            )
-            Text(
-                text = subtitle,
-                color = AegisTextMuted,
-                fontSize = 11.sp,
-                fontFamily = ClassicalBodyFont
-            )
-        }
+        Text(
+            text = title,
+            color = titleColor,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = ClassicalBodyFont,
+            modifier = Modifier.weight(1f).padding(end = 8.dp)
+        )
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             modifier = Modifier.testTag(testTag),
             colors = SwitchDefaults.colors(
                 checkedThumbColor = AegisOnPrimaryWhite,
-                checkedTrackColor = AegisPrimaryCyan,
+                checkedTrackColor = activeColor,
                 uncheckedThumbColor = AegisTextMuted,
                 uncheckedTrackColor = AegisCardBorder
             )
@@ -1030,15 +895,48 @@ private fun PowerOptionSwitchRow(
 @Composable
 fun WhitelistedAppsSection(preferences: AegisPreferences) {
     val whitelisted by preferences.whitelistedPackages.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
-    var packageInput by remember { mutableStateOf("") }
+    var showAppsPicker by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var installedApps by remember { mutableStateOf<List<InstalledAppEntry>>(emptyList()) }
+    var isLoadingApps by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    LuxurySectionHeader(title = "App Whitelisting & Exclusion Rules", accentColor = AegisPrimaryCyan)
-    Spacer(modifier = Modifier.height(8.dp))
+    // Resolve installed launchable apps asynchronously when picker opens
+    LaunchedEffect(showAppsPicker) {
+        if (showAppsPicker && installedApps.isEmpty()) {
+            isLoadingApps = true
+            installedApps = withContext(Dispatchers.IO) {
+                val pm = context.packageManager
+                val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                val activities = pm.queryIntentActivities(intent, 0)
+                activities
+                    .mapNotNull { resolveInfo ->
+                        val pkg = resolveInfo.activityInfo?.packageName ?: return@mapNotNull null
+                        if (pkg == context.packageName) return@mapNotNull null
+                        val label = resolveInfo.loadLabel(pm)?.toString()?.trim().orEmpty().ifBlank { pkg }
+                        val icon = try {
+                            drawableToScaledBitmap(resolveInfo.loadIcon(pm))
+                        } catch (_: Exception) {
+                            null
+                        }
+                        InstalledAppEntry(packageName = pkg, label = label, icon = icon)
+                    }
+                    .distinctBy { it.packageName }
+                    .sortedBy { it.label.lowercase() }
+            }
+            isLoadingApps = false
+        }
+    }
+
+    LuxurySectionHeader(title = "Excluded Apps", accentColor = AegisPrimaryCyan)
+    Spacer(modifier = Modifier.height(6.dp))
     CyberCard(
         borderColor = AegisLavenderBorder,
         tone = CyberCardTone.SKY,
+        onClick = {
+            searchQuery = ""
+            showAppsPicker = true
+        },
         modifier = Modifier.testTag("whitelisted_apps_card")
     ) {
         Row(
@@ -1046,66 +944,113 @@ fun WhitelistedAppsSection(preferences: AegisPreferences) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Excluded Apps (${whitelisted.size})",
-                    color = AegisTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = ClassicalDisplayFont
-                )
-                Text(
-                    text = "Bypass AI screen guard & blocking for trusted apps",
-                    color = AegisTextSecondary,
-                    fontSize = 12.sp,
-                    fontFamily = ClassicalBodyFont
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(AegisPrimaryCyan.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Apps,
+                        contentDescription = "Select apps to exclude",
+                        tint = AegisPrimaryCyan,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Excluded Apps (${whitelisted.size})",
+                        color = AegisTextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalDisplayFont
+                    )
+                    Text(
+                        text = "Tap to choose installed apps",
+                        color = AegisTextMuted,
+                        fontSize = 11.sp,
+                        fontFamily = ClassicalBodyFont
+                    )
+                }
             }
             Button(
                 onClick = {
-                    packageInput = ""
-                    showAddDialog = true
+                    searchQuery = ""
+                    showAppsPicker = true
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan),
+                colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("add_whitelist_button")
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .height(48.dp)
+                    .testTag("add_whitelist_button")
             ) {
-                Text("ADD APP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("SELECT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         if (whitelisted.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = AegisCardBorder.copy(alpha = 0.45f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 whitelisted.forEach { pkg ->
+                    val resolvedLabel = remember(pkg, installedApps) {
+                        installedApps.firstOrNull { it.packageName == pkg }?.label ?: try {
+                            val ai = context.packageManager.getApplicationInfo(pkg, 0)
+                            context.packageManager.getApplicationLabel(ai).toString()
+                        } catch (_: Exception) {
+                            pkg
+                        }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(AegisSurfaceElevated, RoundedCornerShape(10.dp))
-                            .border(1.dp, AegisLavenderBorder, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .clip(RoundedCornerShape(50))
+                            .background(AegisSurfaceElevated)
+                            .border(1.dp, AegisLavenderBorder, RoundedCornerShape(50))
+                            .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = pkg,
-                            color = AegisTextPrimary,
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedButton(
+                        Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
+                            Text(
+                                text = resolvedLabel,
+                                color = AegisTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = ClassicalBodyFont,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (resolvedLabel != pkg) {
+                                Text(
+                                    text = pkg,
+                                    color = AegisTextMuted,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        IconButton(
                             onClick = {
                                 preferences.removeWhitelistedPackage(pkg)
-                                Toast.makeText(context, "Removed $pkg from whitelist", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Removed $resolvedLabel", Toast.LENGTH_SHORT).show()
                             },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Text("Remove", fontSize = 10.sp, color = AegisWarningAmber)
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove $resolvedLabel",
+                                tint = AegisWarningAmber,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
@@ -1113,29 +1058,169 @@ fun WhitelistedAppsSection(preferences: AegisPreferences) {
         }
     }
 
-    if (showAddDialog) {
+    if (showAppsPicker) {
+        val filteredApps = remember(installedApps, searchQuery, whitelisted) {
+            val q = searchQuery.trim().lowercase()
+            val list = if (q.isEmpty()) installedApps else installedApps.filter {
+                it.label.lowercase().contains(q) || it.packageName.lowercase().contains(q)
+            }
+            list.sortedByDescending { whitelisted.contains(it.packageName) }
+        }
+
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
+            onDismissRequest = { showAppsPicker = false },
             containerColor = AegisLavenderSoft,
-            title = { Text("Whitelist App Package", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
+            modifier = Modifier.testTag("installed_apps_picker_dialog"),
+            title = {
+                Text(
+                    text = "Tap Apps to Exclude",
+                    fontFamily = ClassicalDisplayFont,
+                    fontWeight = FontWeight.Bold,
+                    color = AegisTextPrimary
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Enter the exact package name to exclude from scanning (e.g. com.whatsapp, com.google.android.youtube):", fontSize = 12.sp, fontFamily = ClassicalBodyFont)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedTextField(
-                        value = packageInput,
-                        onValueChange = { packageInput = it },
-                        label = { Text("Package Name") },
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search installed apps...", fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = AegisPurple,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AegisPrimaryCyan,
+                            unfocusedBorderColor = AegisLavenderBorder,
+                            focusedContainerColor = AegisCardBackground,
+                            unfocusedContainerColor = AegisCardBackground,
+                            focusedTextColor = AegisTextPrimary,
+                            unfocusedTextColor = AegisTextPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("installed_apps_search_input")
                     )
-                    Text("Quick suggestions:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AegisPurple)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("com.whatsapp", "com.google.android.youtube", "com.android.chrome", "com.google.android.gm").forEach { suggestion ->
-                            OutlinedButton(
-                                onClick = { packageInput = suggestion },
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(suggestion.substringAfterLast('.'), fontSize = 10.sp)
+
+                    if (isLoadingApps) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = AegisPurple)
+                        }
+                    } else if (filteredApps.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No matching installed apps found",
+                                color = AegisTextMuted,
+                                fontSize = 12.sp,
+                                fontFamily = ClassicalBodyFont
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(filteredApps, key = { it.packageName }) { app ->
+                                val isExcluded = whitelisted.contains(app.packageName)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(if (isExcluded) AegisPrimaryCyan.copy(alpha = 0.14f) else AegisCardBackground)
+                                        .border(
+                                            width = if (isExcluded) 1.4.dp else 1.dp,
+                                            color = if (isExcluded) AegisPrimaryCyan else AegisLavenderBorder.copy(alpha = 0.65f),
+                                            shape = RoundedCornerShape(14.dp)
+                                        )
+                                        .clickable {
+                                            if (isExcluded) {
+                                                preferences.removeWhitelistedPackage(app.packageName)
+                                            } else {
+                                                preferences.addWhitelistedPackage(app.packageName)
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                    ) {
+                                        if (app.icon != null) {
+                                            Image(
+                                                bitmap = app.icon,
+                                                contentDescription = app.label,
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .clip(RoundedCornerShape(9.dp))
+                                            )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .clip(CircleShape)
+                                                    .background(AegisPurple.copy(alpha = 0.16f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = app.label.take(1).uppercase(),
+                                                    color = AegisPurple,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = app.label,
+                                                color = AegisTextPrimary,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = ClassicalBodyFont,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = app.packageName,
+                                                color = AegisTextMuted,
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = if (isExcluded) "Excluded" else "Not excluded",
+                                        tint = if (isExcluded) AegisPrimaryCyan else AegisCardBorder,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1143,21 +1228,10 @@ fun WhitelistedAppsSection(preferences: AegisPreferences) {
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        if (packageInput.isNotBlank()) {
-                            preferences.addWhitelistedPackage(packageInput.trim())
-                            Toast.makeText(context, "Whitelisted ${packageInput.trim()}", Toast.LENGTH_SHORT).show()
-                            showAddDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
+                    onClick = { showAppsPicker = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan, contentColor = AegisOnPrimaryWhite)
                 ) {
-                    Text("ADD TO WHITELIST", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showAddDialog = false }) {
-                    Text("CANCEL")
+                    Text("DONE", fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -1174,8 +1248,8 @@ private fun ScheduledProtectionSection(
     val endMinutes by preferences.scheduleEndMinutes.collectAsState()
     val isActiveNow = scheduleEnabled && preferences.isWithinScheduledWindow()
 
-    LuxurySectionHeader(title = "Scheduled Protection Hours", accentColor = AegisPurple)
-    Spacer(modifier = Modifier.height(8.dp))
+    LuxurySectionHeader(title = "Scheduled Guard", accentColor = AegisPurple)
+    Spacer(modifier = Modifier.height(6.dp))
     CyberCard(
         borderColor = if (isActiveNow) AegisPrimaryCyan.copy(alpha = 0.55f) else AegisLavenderBorder,
         tone = CyberCardTone.LAVENDER,
@@ -1188,12 +1262,12 @@ private fun ScheduledProtectionSection(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f).padding(end = 10.dp)
+                modifier = Modifier.weight(1f).padding(end = 8.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(
                             brush = Brush.linearGradient(
                                 colors = listOf(AegisPurple, AegisPrimaryCyan)
@@ -1205,22 +1279,22 @@ private fun ScheduledProtectionSection(
                         imageVector = Icons.Default.Schedule,
                         contentDescription = "Scheduled protection hours",
                         tint = AegisOnPrimaryWhite,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "Bedtime & Study Guard",
+                        text = "Quiet Hours",
                         color = AegisTextPrimary,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = ClassicalDisplayFont
                     )
                     Text(
                         text = "${AegisPreferences.formatClockTime(startMinutes)} → ${AegisPreferences.formatClockTime(endMinutes)}",
                         color = if (scheduleEnabled) AegisPrimaryCyan else AegisTextMuted,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = ClassicalBodyFont
                     )
@@ -1231,7 +1305,7 @@ private fun ScheduledProtectionSection(
                 checked = scheduleEnabled,
                 onCheckedChange = { enabled ->
                     if (!enabled) {
-                        masterKeyGate.request("disable Scheduled Protection Hours") {
+                        masterKeyGate.request("disable Scheduled Guard") {
                             preferences.setScheduleEnabled(false)
                         }
                     } else {
@@ -1248,54 +1322,16 @@ private fun ScheduledProtectionSection(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (isActiveNow) "Active right now • Quiet hours enforcement" else if (scheduleEnabled) "Standby until next window" else "Reminder window disabled",
-                color = AegisTextSecondary,
-                fontSize = 11.sp,
-                fontFamily = ClassicalBodyFont,
-                modifier = Modifier.weight(1f)
-            )
-            StatusPill(
-                label = when {
-                    isActiveNow -> "ACTIVE NOW"
-                    scheduleEnabled -> "ARMED"
-                    else -> "OFF"
-                },
-                isActive = isActiveNow,
-                activeColor = AegisPrimaryCyan,
-                inactiveColor = if (scheduleEnabled) AegisPurple else AegisTextMuted
-            )
-        }
-
-        HorizontalDivider(
-            color = AegisLavenderBorder.copy(alpha = 0.6f),
-            modifier = Modifier.padding(vertical = 12.dp)
-        )
-
-        Text(
-            text = "Quick Guard Presets",
-            color = AegisTextPrimary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = ClassicalBodyFont
-        )
         Spacer(modifier = Modifier.height(8.dp))
 
         val presets = listOf(
-            Triple("Night 9P–7A", 21 * 60, 7 * 60),
-            Triple("Sleep 10P–6A", 22 * 60, 6 * 60),
-            Triple("Study 2P–6P", 14 * 60, 18 * 60)
+            Triple("9P–7A", 21 * 60, 7 * 60),
+            Triple("10P–6A", 22 * 60, 6 * 60),
+            Triple("2P–6P", 14 * 60, 18 * 60)
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             presets.forEach { (label, pStart, pEnd) ->
                 val isSelected = startMinutes == pStart && endMinutes == pEnd
@@ -1304,8 +1340,8 @@ private fun ScheduledProtectionSection(
                         preferences.setScheduleWindow(pStart, pEnd)
                         if (!scheduleEnabled) preferences.setScheduleEnabled(true)
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (isSelected) AegisPurple else AegisCardBackground,
                         contentColor = if (isSelected) AegisOnPrimaryWhite else AegisTextPrimary
@@ -1325,14 +1361,14 @@ private fun ScheduledProtectionSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             ScheduleHourStepper(
-                label = "Start Time",
+                label = "Start",
                 minuteOfDay = startMinutes,
                 onMinusHour = {
                     val next = (startMinutes - 60 + 1440) % 1440
@@ -1345,7 +1381,7 @@ private fun ScheduledProtectionSection(
                 modifier = Modifier.weight(1f)
             )
             ScheduleHourStepper(
-                label = "End Time",
+                label = "End",
                 minuteOfDay = endMinutes,
                 onMinusHour = {
                     val next = (endMinutes - 60 + 1440) % 1440
@@ -1371,28 +1407,21 @@ private fun ScheduleHourStepper(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(AegisSurfaceElevated)
-            .border(1.dp, AegisLavenderBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .border(1.dp, AegisLavenderBorder, RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = label,
-            color = AegisTextMuted,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = ClassicalBodyFont
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = AegisPreferences.formatClockTime(minuteOfDay),
+            text = "$label: ${AegisPreferences.formatClockTime(minuteOfDay)}",
             color = AegisTextPrimary,
-            fontSize = 13.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = ClassicalDisplayFont
+            fontFamily = ClassicalBodyFont,
+            maxLines = 1
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1400,7 +1429,7 @@ private fun ScheduleHourStepper(
             OutlinedButton(
                 onClick = onMinusHour,
                 contentPadding = PaddingValues(0.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
@@ -1410,7 +1439,7 @@ private fun ScheduleHourStepper(
             OutlinedButton(
                 onClick = onPlusHour,
                 contentPadding = PaddingValues(0.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
@@ -1420,4 +1449,3 @@ private fun ScheduleHourStepper(
         }
     }
 }
-

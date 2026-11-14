@@ -32,27 +32,29 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.AegisChampagneGold
-import com.example.ui.theme.AegisChampagneSoft
 import com.example.ui.theme.AegisCyanGlow
 import com.example.ui.theme.AegisDangerRed
 import com.example.ui.theme.AegisElectricBlue
-import com.example.ui.theme.AegisMintSoft
-import com.example.ui.theme.AegisOpticalTeal
+import com.example.ui.theme.AegisLavenderLight
 import com.example.ui.theme.AegisPrimaryCyan
 import com.example.ui.theme.AegisPurple
 import com.example.ui.theme.AegisRedGlow
-import com.example.ui.theme.AegisSecondaryBackground
-import com.example.ui.theme.AegisSuccessGreen
-import com.example.ui.theme.AegisTextMuted
 import kotlinx.coroutines.launch
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * Pure VIP layered crystal shield crest with continuous smooth levitation,
+ * rotating aurora sweep halo, orbiting constellation nodes, specular glass sheen,
+ * and spring-animated shockwave activation.
+ */
 @Composable
 fun AegisShieldGraphic(
     isProtected: Boolean,
@@ -60,30 +62,55 @@ fun AegisShieldGraphic(
     modifier: Modifier = Modifier,
     size: Dp = 180.dp
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "SheildlenzCrestMotion")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "PulseAlpha"
-    )
+    val infiniteTransition = rememberInfiniteTransition(label = "VipCrystalShieldMotion")
 
-    val apertureAngle by infiniteTransition.animateFloat(
+    // Smooth continuous aurora sweep rotation (360 deg in 5.2s)
+    val sweepAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 12000, easing = LinearEasing),
+            animation = tween(durationMillis = 5200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "ApertureRotation"
+        label = "AuroraSweepAngle"
+    )
+
+    // Counter-rotating inner orbital phase
+    val orbitAngle by infiniteTransition.animateFloat(
+        initialValue = 360f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 7600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "OrbitConstellationAngle"
+    )
+
+    // Smooth breathing levitation & glow pulse
+    val breathPhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BreathPhase"
+    )
+
+    // Specular glass sheen glide across crystal face
+    val glassSheen by infiniteTransition.animateFloat(
+        initialValue = -0.6f,
+        targetValue = 1.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "GlassSheenGlide"
     )
 
     val activationProgress by animateFloatAsState(
         targetValue = if (isProtected || isThreatActive) 1f else 0f,
-        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
         label = "ActivationProgress"
     )
 
@@ -98,9 +125,9 @@ fun AegisShieldGraphic(
         if (prev != null && prev != isProtected) {
             waveDirection = if (isProtected) 1 else -1
             launch {
-                crestScale.snapTo(if (isProtected) 0.85f else 1.08f)
+                crestScale.snapTo(if (isProtected) 0.85f else 1.07f)
                 crestScale.animateTo(
-                    targetValue = if (isProtected) 1.12f else 0.92f,
+                    targetValue = if (isProtected) 1.11f else 0.93f,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessMedium
@@ -118,292 +145,252 @@ fun AegisShieldGraphic(
                 waveProgress.snapTo(0f)
                 waveProgress.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 680, easing = FastOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 660, easing = FastOutSlowInEasing)
                 )
                 waveDirection = 0
             }
         }
     }
 
-    val primaryColor by animateColorAsState(
+    val shieldPrimary by animateColorAsState(
         targetValue = when {
             isThreatActive -> AegisDangerRed
             isProtected -> AegisPrimaryCyan
-            else -> AegisTextMuted
+            else -> Color(0xFF6B86C4)
         },
-        animationSpec = tween(480),
-        label = "ShieldPrimaryColor"
+        animationSpec = tween(460),
+        label = "ShieldPrimary"
     )
 
-    val rimSecondaryColor by animateColorAsState(
+    val shieldAccent by animateColorAsState(
         targetValue = when {
-            isThreatActive -> AegisDangerRed.copy(alpha = 0.72f)
+            isThreatActive -> AegisChampagneGold
             isProtected -> AegisElectricBlue
-            else -> AegisTextMuted.copy(alpha = 0.65f)
+            else -> AegisLavenderLight
         },
-        animationSpec = tween(480),
-        label = "ShieldRimSecondaryColor"
+        animationSpec = tween(460),
+        label = "ShieldAccent"
     )
 
-    val lensAccent by animateColorAsState(
+    val haloAccent by animateColorAsState(
         targetValue = when {
-            isThreatActive -> AegisDangerRed
-            isProtected -> AegisOpticalTeal
-            else -> AegisTextMuted.copy(alpha = 0.6f)
+            isThreatActive -> AegisChampagneGold
+            isProtected -> AegisElectricBlue
+            else -> AegisPurple
         },
-        animationSpec = tween(480),
-        label = "LensAccentColor"
-    )
-
-    val coreDotColor by animateColorAsState(
-        targetValue = when {
-            isThreatActive -> AegisDangerRed
-            isProtected -> AegisSuccessGreen
-            else -> AegisTextMuted
-        },
-        animationSpec = tween(480),
-        label = "CoreDotColor"
+        animationSpec = tween(460),
+        label = "HaloAccent"
     )
 
     val glowColor by animateColorAsState(
         targetValue = when {
             isThreatActive -> AegisRedGlow
             isProtected -> AegisCyanGlow
-            else -> Color.Transparent
+            else -> Color(0x2E7C5CFA)
         },
-        animationSpec = tween(480),
-        label = "ShieldGlowColor"
+        animationSpec = tween(460),
+        label = "ShieldGlow"
     )
 
     Box(
         modifier = modifier
             .size(size)
             .graphicsLayer {
+                val floatDp = ((breathPhase - 0.5f) * 6f).dp.toPx()
+                translationY = floatDp
                 scaleX = crestScale.value
                 scaleY = crestScale.value
             },
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
-            val width = this.size.width
-            val height = this.size.height
-            val center = Offset(width * 0.5f, height * 0.49f)
+            val w = this.size.width
+            val h = this.size.height
+            val center = Offset(w * 0.5f, h * 0.50f)
 
-            // Smooth radial sanctuary halo on ON / Threat transitions
-            if (activationProgress > 0.01f && glowColor.alpha > 0f) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            glowColor.copy(alpha = glowColor.alpha * 1.5f * pulseAlpha * activationProgress),
-                            AegisChampagneGold.copy(alpha = 0.09f * pulseAlpha * activationProgress),
-                            Color.Transparent
-                        ),
-                        center = center,
-                        radius = width * (0.44f + 0.16f * activationProgress)
+            // 1. Living breathing aura behind shield
+            val auraRadius = w * (0.45f + 0.08f * breathPhase + 0.10f * activationProgress)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        glowColor.copy(alpha = (0.30f + 0.42f * activationProgress) * (0.75f + 0.25f * breathPhase)),
+                        haloAccent.copy(alpha = (0.14f + 0.14f * activationProgress) * breathPhase),
+                        Color.Transparent
                     ),
-                    radius = width * (0.44f + 0.16f * activationProgress),
-                    center = center
-                )
-            }
+                    center = center,
+                    radius = auraRadius
+                ),
+                radius = auraRadius,
+                center = center
+            )
 
-            // ON / OFF transition shockwave or power-down contraction ring
+            // 2. Toggle activation burst ripple
             if (waveDirection != 0 && waveProgress.value in 0.01f..0.99f) {
                 val p = waveProgress.value
-                val waveRadius = if (waveDirection > 0) {
-                    width * (0.18f + 0.40f * p)
-                } else {
-                    width * (0.52f - 0.32f * p)
-                }
-                val waveAlpha = (1f - p) * 0.70f
-                val waveColor = if (waveDirection > 0) AegisPrimaryCyan else AegisChampagneGold
+                val waveRadius = if (waveDirection > 0) w * (0.20f + 0.36f * p) else w * (0.48f - 0.28f * p)
+                val waveAlpha = (1f - p) * 0.85f
+                val waveColor = if (waveDirection > 0) AegisElectricBlue else AegisPurple
                 drawCircle(
                     color = waveColor.copy(alpha = waveAlpha),
                     radius = waveRadius,
                     center = center,
-                    style = Stroke(width = (3.5.dp.toPx() * (1f - p * 0.5f)))
+                    style = Stroke(width = 3.2.dp.toPx() * (1f - p * 0.45f))
                 )
             }
 
-            // Soft concentric orbital hairline rings
-            drawCircle(
-                color = (if (isThreatActive) AegisDangerRed else AegisChampagneGold)
-                    .copy(alpha = 0.14f + (0.18f * pulseAlpha * activationProgress)),
-                radius = width * (0.46f + 0.03f * activationProgress),
-                center = center,
-                style = Stroke(width = 1.2.dp.toPx())
-            )
-
-            // Orbiting active energy spark dots
-            if (activationProgress > 0.1f) {
-                val sparkRadius = width * 0.46f
-                for (i in 0 until 3) {
-                    val angleDeg = apertureAngle + i * 120f
-                    val angleRad = Math.toRadians(angleDeg.toDouble())
-                    val sparkX = center.x + (sparkRadius * cos(angleRad)).toFloat()
-                    val sparkY = center.y + (sparkRadius * sin(angleRad)).toFloat()
-                    drawCircle(
-                        color = (if (i % 2 == 0) AegisPrimaryCyan else AegisPurple).copy(alpha = 0.85f * activationProgress),
-                        radius = 3.dp.toPx(),
-                        center = Offset(sparkX, sparkY)
-                    )
-                }
-            }
-
-            // Heraldic Sheildlenz Crest Geometry
-            val shieldPath = Path().apply {
-                moveTo(width * 0.5f, height * 0.08f)
-                cubicTo(
-                    width * 0.72f, height * 0.08f,
-                    width * 0.87f, height * 0.15f,
-                    width * 0.89f, height * 0.30f
-                )
-                cubicTo(
-                    width * 0.89f, height * 0.62f,
-                    width * 0.68f, height * 0.82f,
-                    width * 0.5f, height * 0.94f
-                )
-                cubicTo(
-                    width * 0.32f, height * 0.82f,
-                    width * 0.11f, height * 0.62f,
-                    width * 0.11f, height * 0.30f
-                )
-                cubicTo(
-                    width * 0.13f, height * 0.15f,
-                    width * 0.28f, height * 0.08f,
-                    width * 0.5f, height * 0.08f
-                )
-                close()
-            }
-
-            // Luminous Sky-Lavender Satin Shield Interior
-            drawPath(
-                path = shieldPath,
-                brush = Brush.verticalGradient(
-                    colors = if (isThreatActive) {
-                        listOf(AegisChampagneSoft, Color(0xFFFFDE99))
-                    } else if (isProtected) {
-                        listOf(Color(0xFFDCEBFF), Color(0xFFE5D8FF))
-                    } else {
-                        listOf(Color(0xFFE8F2FF), AegisSecondaryBackground)
-                    }
-                )
-            )
-
-            // Inner Champagne-Gold Bevel Crest
-            val innerPath = Path().apply {
-                moveTo(width * 0.5f, height * 0.14f)
-                cubicTo(
-                    width * 0.69f, height * 0.14f,
-                    width * 0.81f, height * 0.20f,
-                    width * 0.83f, height * 0.32f
-                )
-                cubicTo(
-                    width * 0.83f, height * 0.59f,
-                    width * 0.65f, height * 0.77f,
-                    width * 0.5f, height * 0.88f
-                )
-                cubicTo(
-                    width * 0.35f, height * 0.77f,
-                    width * 0.17f, height * 0.59f,
-                    width * 0.17f, height * 0.32f
-                )
-                cubicTo(
-                    width * 0.19f, height * 0.20f,
-                    width * 0.31f, height * 0.14f,
-                    width * 0.5f, height * 0.14f
-                )
-                close()
-            }
-
-            drawPath(
-                path = innerPath,
-                color = if (isThreatActive) AegisDangerRed.copy(alpha = 0.50f)
-                else AegisChampagneGold.copy(alpha = 0.35f + 0.40f * activationProgress),
-                style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-
-            // Outer Bold Heraldic Rim
-            drawPath(
-                path = shieldPath,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        primaryColor,
-                        rimSecondaryColor
-                    )
-                ),
-                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-
-            // Center Optical Lens Housing (Sheildlenz signature motif)
-            val lensCenter = Offset(width * 0.5f, height * 0.47f)
-            val outerLensRadius = width * 0.21f
-            val innerLensRadius = width * (0.115f + 0.015f * activationProgress)
-
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = when {
-                        isThreatActive -> listOf(
-                            AegisChampagneSoft,
-                            AegisChampagneGold.copy(alpha = 0.88f)
-                        )
-                        isProtected -> listOf(
-                            AegisMintSoft,
-                            AegisElectricBlue.copy(alpha = 0.88f)
-                        )
-                        else -> listOf(
-                            AegisSecondaryBackground,
-                            AegisTextMuted.copy(alpha = 0.55f)
-                        )
-                    },
-                    center = lensCenter,
-                    radius = outerLensRadius
-                ),
-                radius = outerLensRadius,
-                center = lensCenter
-            )
-
-            // Rotating segmented optical iris arcs expanding & spinning when ON
-            val arcTopLeft = Offset(lensCenter.x - outerLensRadius * 0.78f, lensCenter.y - outerLensRadius * 0.78f)
-            val arcSize = Size(outerLensRadius * 1.56f, outerLensRadius * 1.56f)
-            rotate(degrees = apertureAngle * activationProgress, pivot = lensCenter) {
-                for (i in 0 until 4) {
-                    drawArc(
-                        color = lensAccent.copy(alpha = 0.45f + 0.45f * activationProgress),
-                        startAngle = i * 90f + 10f,
-                        sweepAngle = 32f + 28f * activationProgress,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-            }
-
-            // Inner glowing cyan/sapphire glass core
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.95f),
-                        lensAccent.copy(alpha = 0.85f + 0.10f * activationProgress),
-                        primaryColor
+            // 3. Smooth luminous aurora sweep-gradient orbital halo
+            val ringRadius = w * 0.43f
+            val ringTopLeft = Offset(center.x - ringRadius, center.y - ringRadius)
+            val ringSize = Size(ringRadius * 2f, ringRadius * 2f)
+            rotate(degrees = sweepAngle, pivot = center) {
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            haloAccent.copy(alpha = 0.22f + 0.30f * activationProgress),
+                            shieldPrimary.copy(alpha = 0.65f + 0.30f * activationProgress),
+                            Color.White.copy(alpha = 0.90f),
+                            Color.Transparent
+                        ),
+                        center = center
                     ),
-                    center = Offset(lensCenter.x - innerLensRadius * 0.28f, lensCenter.y - innerLensRadius * 0.28f),
-                    radius = innerLensRadius * 1.3f
-                ),
-                radius = innerLensRadius,
-                center = lensCenter
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = ringTopLeft,
+                    size = ringSize,
+                    style = Stroke(width = (2.4f + 0.8f * activationProgress).dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+
+            // 4. Counter-rotating orbiting pearl nodes on outer ring
+            val orbCount = 3
+            for (i in 0 until orbCount) {
+                val theta = ((orbitAngle + i * (360f / orbCount)) * PI / 180.0)
+                val ox = center.x + (ringRadius * cos(theta)).toFloat()
+                val oy = center.y + (ringRadius * sin(theta)).toFloat()
+                val orbColor = if (i % 2 == 0) shieldPrimary else haloAccent
+                drawCircle(
+                    color = orbColor.copy(alpha = 0.28f + 0.25f * breathPhase),
+                    radius = 5.5.dp.toPx(),
+                    center = Offset(ox, oy)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 2.8.dp.toPx(),
+                    center = Offset(ox, oy)
+                )
+            }
+
+            // 5. Outer sculpted crystal shield geometry
+            val shieldPath = Path().apply {
+                val cx = center.x
+                val cy = center.y
+                val sw = w * 0.34f
+                val sh = h * 0.37f
+                moveTo(cx, cy - sh * 1.06f)
+                cubicTo(cx + sw * 0.95f, cy - sh * 0.78f, cx + sw * 0.96f, cy - sh * 0.14f, cx + sw * 0.84f, cy + sh * 0.44f)
+                cubicTo(cx + sw * 0.64f, cy + sh * 0.88f, cx, cy + sh * 1.08f, cx, cy + sh * 1.08f)
+                cubicTo(cx, cy + sh * 1.08f, cx - sw * 0.64f, cy + sh * 0.88f, cx - sw * 0.84f, cy + sh * 0.44f)
+                cubicTo(cx - sw * 0.96f, cy - sh * 0.14f, cx - sw * 0.95f, cy - sh * 0.78f, cx, cy - sh * 1.06f)
+                close()
+            }
+
+            // Layered frosted crystal glass fill + diagonal specular sheen sweep
+            clipPath(shieldPath) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = if (isProtected) {
+                            listOf(Color(0xFFFFFFFF), Color(0xFFDCEBFF), Color(0xFFE7D8FF))
+                        } else {
+                            listOf(Color(0xFFFFFFFF), Color(0xFFEAF1FF), Color(0xFFF0E8FF))
+                        }
+                    )
+                )
+
+                // Subtle dual-facet depth on right half
+                drawRect(
+                    color = haloAccent.copy(alpha = 0.06f + 0.06f * activationProgress),
+                    topLeft = Offset(center.x, 0f),
+                    size = Size(w * 0.5f, h)
+                )
+
+                // Moving glass specular gleam
+                val sheenX = w * glassSheen
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.72f),
+                            Color.Transparent
+                        ),
+                        start = Offset(sheenX - w * 0.24f, 0f),
+                        end = Offset(sheenX + w * 0.24f, h)
+                    )
+                )
+            }
+
+            // Inner white specular rim
+            val innerShieldPath = Path().apply {
+                val cx = center.x
+                val cy = center.y
+                val sw = w * 0.28f
+                val sh = h * 0.305f
+                moveTo(cx, cy - sh * 1.05f)
+                cubicTo(cx + sw * 0.90f, cy - sh * 0.76f, cx + sw * 0.92f, cy - sh * 0.12f, cx + sw * 0.80f, cy + sh * 0.40f)
+                cubicTo(cx + sw * 0.60f, cy + sh * 0.84f, cx, cy + sh * 1.05f, cx, cy + sh * 1.05f)
+                cubicTo(cx, cy + sh * 1.05f, cx - sw * 0.60f, cy + sh * 0.84f, cx - sw * 0.80f, cy + sh * 0.40f)
+                cubicTo(cx - sw * 0.92f, cy - sh * 0.12f, cx - sw * 0.90f, cy - sh * 0.76f, cx, cy - sh * 1.05f)
+                close()
+            }
+            drawPath(
+                path = innerShieldPath,
+                color = Color.White.copy(alpha = 0.92f),
+                style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
 
-            // Specular crystal highlight & status pupil
+            // Crisp luminous sculpted outer shield rim
+            drawPath(
+                path = shieldPath,
+                brush = Brush.linearGradient(
+                    colors = listOf(shieldPrimary, shieldAccent, haloAccent),
+                    start = Offset(center.x - w * 0.3f, center.y - h * 0.4f),
+                    end = Offset(center.x + w * 0.3f, center.y + h * 0.4f)
+                ),
+                style = Stroke(width = 3.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+
+            // 6. Center floating medallion orb with breathing halo
+            val coreRadius = w * (0.155f + 0.012f * breathPhase)
             drawCircle(
-                color = coreDotColor,
-                radius = innerLensRadius * (0.34f + 0.06f * activationProgress),
-                center = lensCenter
+                color = shieldPrimary.copy(alpha = 0.20f + 0.18f * activationProgress),
+                radius = coreRadius * 1.24f,
+                center = center
             )
             drawCircle(
-                color = Color.White.copy(alpha = 0.85f),
-                radius = innerLensRadius * 0.22f,
-                center = Offset(lensCenter.x - innerLensRadius * 0.35f, lensCenter.y - innerLensRadius * 0.35f)
+                brush = Brush.linearGradient(
+                    colors = if (isProtected) {
+                        listOf(AegisElectricBlue, AegisPrimaryCyan, AegisPurple)
+                    } else {
+                        listOf(Color(0xFF93ACE6), Color(0xFF8C77F5))
+                    },
+                    start = Offset(center.x - coreRadius, center.y - coreRadius),
+                    end = Offset(center.x + coreRadius, center.y + coreRadius)
+                ),
+                radius = coreRadius,
+                center = center
+            )
+
+            // Crisp inner emblem (Checkmark when active, clean protective shield-check when standby)
+            val checkPath = Path().apply {
+                moveTo(center.x - coreRadius * 0.38f, center.y + coreRadius * 0.04f)
+                lineTo(center.x - coreRadius * 0.08f, center.y + coreRadius * 0.34f)
+                lineTo(center.x + coreRadius * 0.42f, center.y - coreRadius * 0.32f)
+            }
+            drawPath(
+                path = checkPath,
+                color = Color.White,
+                style = Stroke(width = 3.0.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
         }
     }

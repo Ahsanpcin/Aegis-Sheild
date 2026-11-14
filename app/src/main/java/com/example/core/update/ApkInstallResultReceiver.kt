@@ -51,17 +51,23 @@ class ApkInstallResultReceiver : BroadcastReceiver() {
             }
             PackageInstaller.STATUS_FAILURE_CONFLICT -> {
                 AegisBackgroundDownloadService.stop(context.applicationContext)
-                UpdateChecker.onPackageInstallFailed(
-                    "Existing app uses a different signing key. Uninstall the old Sheildlenz build once, then install this update."
-                )
+                UpdateChecker.onPackageInstallConflict(context.applicationContext)
             }
             else -> {
                 Log.w(TAG, "PackageInstaller session error ($status): $statusMessage")
-                val recovered = UpdateChecker.fallbackViewInstallIfPending(context.applicationContext)
-                if (!recovered) {
-                    UpdateChecker.onPackageInstallFailed(
-                        statusMessage ?: "Auto-install failed (code $status)."
-                    )
+                if (statusMessage?.contains("conflict", ignoreCase = true) == true ||
+                    statusMessage?.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE", ignoreCase = true) == true ||
+                    statusMessage?.contains("INSTALL_FAILED_VERSION_DOWNGRADE", ignoreCase = true) == true
+                ) {
+                    AegisBackgroundDownloadService.stop(context.applicationContext)
+                    UpdateChecker.onPackageInstallConflict(context.applicationContext, statusMessage)
+                } else {
+                    val recovered = UpdateChecker.fallbackViewInstallIfPending(context.applicationContext)
+                    if (!recovered) {
+                        UpdateChecker.onPackageInstallFailed(
+                            statusMessage ?: "Auto-install failed (code $status)."
+                        )
+                    }
                 }
             }
         }
