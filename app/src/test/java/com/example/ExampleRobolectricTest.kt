@@ -623,6 +623,15 @@ class ExampleRobolectricTest {
             )
         )
 
+        // Updating / Installing Sheildlenz in PackageInstaller must NOT trigger Guardian Password
+        assertFalse(
+            AegisAccessibilityService.shouldTriggerAntiTamper(
+                packageName = "com.google.android.packageinstaller",
+                className = "com.android.packageinstaller.InstallInstalling",
+                screenText = "Sheildlenz Do you want to update this app?"
+            )
+        )
+
         // Opening Sheildlenz App Info / Force Stop / Device Admin / Accessibility MUST trigger password
         assertTrue(
             AegisAccessibilityService.shouldTriggerAntiTamper(

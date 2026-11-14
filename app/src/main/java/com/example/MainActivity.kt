@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.core.permissions.PermissionHelper
+import com.example.core.update.UpdateChecker
 import com.example.di.AegisContainer
 import com.example.services.protection.AegisLockdownService
 import com.example.services.protection.AegisProtectionService
@@ -44,6 +45,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Silently check latest GitHub release vs current app version on startup
+        UpdateChecker.startCheckForUpdates(showUpToDatePopup = false)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
@@ -92,6 +95,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         container.protectionRepository.refreshPermissionHealth()
+        UpdateChecker.retryPendingInstallIfAuthorized(this)
         if (container.preferences.isLockdownActive()) {
             AegisLockdownService.start(this)
         } else if (container.preferences.isShieldDesiredActive.value) {

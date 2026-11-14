@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,6 +42,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -338,11 +340,14 @@ private fun AppUpdateCheckerCard() {
     val currentLabel = "v${UpdateChecker.cleanVersionTag(BuildConfig.VERSION_NAME)}"
     val latestLabel = updateInfo?.let { info ->
         "v${UpdateChecker.cleanVersionTag(info.latestVersion)}"
-    } ?: "Not checked"
+    } ?: "Checking..."
+    val hasUpdate = updateInfo?.isUpdateAvailable == true
+    val isBusyDownloading = apkDownloadState is ApkDownloadState.Downloading ||
+        apkDownloadState is ApkDownloadState.Installing
 
     CyberCard(
-        borderColor = AegisLavenderBorder,
-        tone = CyberCardTone.SKY,
+        borderColor = if (hasUpdate) AegisGoldBorder else AegisLavenderBorder,
+        tone = if (hasUpdate) CyberCardTone.GOLD else CyberCardTone.SKY,
         modifier = Modifier.testTag("app_update_checker_card")
     ) {
         Row(
@@ -357,13 +362,13 @@ private fun AppUpdateCheckerCard() {
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             brush = Brush.linearGradient(
-                                colors = listOf(AegisPrimaryCyan, AegisPurple)
+                                colors = if (hasUpdate) listOf(AegisChampagneGold, AegisPurple) else listOf(AegisPrimaryCyan, AegisPurple)
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Update,
+                        imageVector = if (hasUpdate) Icons.Default.Download else Icons.Default.Update,
                         contentDescription = null,
                         tint = AegisOnPrimaryWhite,
                         modifier = Modifier.size(20.dp)
@@ -372,7 +377,7 @@ private fun AppUpdateCheckerCard() {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "App Update Checker",
+                        text = if (hasUpdate) "Update Ready ($latestLabel)" else "App Update Checker",
                         color = AegisTextPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -383,6 +388,19 @@ private fun AppUpdateCheckerCard() {
                         color = AegisTextSecondary,
                         fontSize = 11.sp,
                         fontFamily = ClassicalBodyFont
+                    )
+                }
+            }
+
+            if (hasUpdate && !isBusyDownloading) {
+                IconButton(
+                    onClick = { UpdateChecker.startCheckForUpdates(showUpToDatePopup = true) },
+                    enabled = !isChecking
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Re-check for updates",
+                        tint = AegisPurple
                     )
                 }
             }
@@ -437,7 +455,7 @@ private fun AppUpdateCheckerCard() {
                 Text(
                     text = latestLabel,
                     color = when {
-                        updateInfo?.isUpdateAvailable == true -> AegisChampagneGold
+                        hasUpdate -> AegisChampagneGold
                         updateInfo != null -> AegisPrimaryCyan
                         else -> AegisTextSecondary
                     },
@@ -448,29 +466,207 @@ private fun AppUpdateCheckerCard() {
             }
         }
 
+        // Live inline Download / Auto-Install progress
+        when (val state = apkDownloadState) {
+            is ApkDownloadState.Downloading -> {
+                Spacer(modifier = Modifier.height(12.dp))
+                if (state.progress != null) {
+                    val pct = (state.progress * 100).toInt()
+                    Text(
+                        text = "Downloading in background... $pct% (${UpdateChecker.formatBytesMb(state.bytesDownloaded)} / ${UpdateChecker.formatBytesMb(state.totalBytes)})",
+                        color = AegisPrimaryCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { state.progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = AegisPrimaryCyan,
+                        trackColor = AegisPrimaryCyan.copy(alpha = 0.2f),
+                        strokeCap = StrokeCap.Round
+                    )
+                } else {
+                    Text(
+                        text = "Downloading in background... ${UpdateChecker.formatBytesMb(state.bytesDownloaded)}",
+                        color = AegisPrimaryCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = AegisPrimaryCyan,
+                        trackColor = AegisPrimaryCyan.copy(alpha = 0.2f)
+                    )
+                }
+            }
+            ApkDownloadState.Installing -> {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Download complete! Auto-installing update...",
+                    color = AegisPurple,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalBodyFont
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = AegisPurple,
+                    trackColor = AegisPurple.copy(alpha = 0.2f)
+                )
+            }
+            is ApkDownloadState.ReadyToInstall -> {
+                if (state.needsInstallPermission) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Allow 'Install unknown apps' for Sheildlenz — update installs automatically when you return.",
+                        color = AegisChampagneGold,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = ClassicalBodyFont
+                    )
+                }
+            }
+            ApkDownloadState.Installed -> {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Update installed! App is up to date.",
+                    color = AegisPrimaryCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalBodyFont
+                )
+            }
+            is ApkDownloadState.Failed -> {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = state.message,
+                    color = AegisWarningAmber,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = ClassicalBodyFont
+                )
+            }
+            ApkDownloadState.Idle -> {}
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(
-            onClick = { UpdateChecker.startCheckForUpdates() },
-            enabled = !isChecking,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AegisPrimaryCyan,
-                contentColor = AegisOnPrimaryWhite
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("check_updates_button")
-        ) {
-            if (isChecking) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisOnPrimaryWhite, strokeWidth = 2.dp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("CHECKING VERSION...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            } else {
-                Icon(imageVector = Icons.Default.Update, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("CHECK FOR UPDATES", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        // Primary CTA automatically transforms once an update is detected (no re-checking needed!)
+        when {
+            apkDownloadState is ApkDownloadState.Downloading -> {
+                OutlinedButton(
+                    onClick = { UpdateChecker.cancelApkDownload() },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("cancel_update_download_button")
+                ) {
+                    Text("CANCEL DOWNLOAD", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+            apkDownloadState is ApkDownloadState.Installing -> {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = AegisPurple.copy(alpha = 0.65f),
+                        disabledContentColor = AegisOnPrimaryWhite
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisOnPrimaryWhite, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("AUTO-INSTALLING...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+            (apkDownloadState as? ApkDownloadState.ReadyToInstall)?.needsInstallPermission == true -> {
+                val readyState = apkDownloadState as ApkDownloadState.ReadyToInstall
+                Button(
+                    onClick = { UpdateChecker.autoInstallApk(context, readyState.apkFile) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AegisPurple,
+                        contentColor = AegisOnPrimaryWhite
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("grant_install_permission_button")
+                ) {
+                    Icon(imageVector = Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("ALLOW & AUTO-INSTALL UPDATE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+            hasUpdate -> {
+                val info = updateInfo!!
+                val apkUrl = info.apkDownloadUrl
+                Button(
+                    onClick = {
+                        if (!apkUrl.isNullOrBlank()) {
+                            UpdateChecker.startApkDownload(context, apkUrl)
+                        } else {
+                            UpdateChecker.openReleaseUrl(context, info.releaseUrl)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AegisChampagneGold,
+                        contentColor = AegisOnPrimaryWhite
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("download_install_update_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val sizeHint = if (info.apkSizeBytes > 0L) " (${UpdateChecker.formatBytesMb(info.apkSizeBytes)})" else ""
+                    Text("UPDATE TO $latestLabel$sizeHint", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+            else -> {
+                Button(
+                    onClick = { UpdateChecker.startCheckForUpdates(showUpToDatePopup = true) },
+                    enabled = !isChecking,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AegisPrimaryCyan,
+                        contentColor = AegisOnPrimaryWhite
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("check_updates_button")
+                ) {
+                    if (isChecking) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisOnPrimaryWhite, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("CHECKING VERSION...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    } else {
+                        Icon(imageVector = Icons.Default.Update, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("CHECK FOR UPDATES", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
             }
         }
 
@@ -501,178 +697,5 @@ private fun AppUpdateCheckerCard() {
                 }
             }
         )
-    }
-
-    updateInfo?.let { info ->
-        if (info.isUpdateAvailable) {
-            AlertDialog(
-                onDismissRequest = {
-                    if (apkDownloadState !is ApkDownloadState.Downloading) {
-                        UpdateChecker.dismissUpdatePrompt()
-                    }
-                },
-                containerColor = AegisChampagneSoft,
-                title = {
-                    Text(
-                        "New Version Available ($latestLabel)",
-                        fontFamily = ClassicalDisplayFont,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            "App Version: $currentLabel  →  Latest Version: $latestLabel",
-                            color = AegisTextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalBodyFont
-                        )
-                        if (info.apkSizeBytes > 0L) {
-                            Text(
-                                text = "APK Package Size: ${UpdateChecker.formatBytesMb(info.apkSizeBytes)}",
-                                color = AegisPurple,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = ClassicalBodyFont
-                            )
-                        }
-                        Text(
-                            "Release Notes:\n${info.releaseNotes ?: "Bug fixes and improvements"}",
-                            color = AegisTextPrimary,
-                            fontSize = 12.sp,
-                            fontFamily = ClassicalBodyFont
-                        )
-
-                        when (val state = apkDownloadState) {
-                            is ApkDownloadState.Downloading -> {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                if (state.progress != null) {
-                                    LinearProgressIndicator(
-                                        progress = { state.progress },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp)
-                                            .clip(RoundedCornerShape(4.dp)),
-                                        color = AegisPrimaryCyan,
-                                        trackColor = AegisPrimaryCyan.copy(alpha = 0.2f),
-                                        strokeCap = StrokeCap.Round
-                                    )
-                                    val pct = (state.progress * 100).toInt()
-                                    Text(
-                                        text = "Downloading APK... $pct% (${UpdateChecker.formatBytesMb(state.bytesDownloaded)} / ${UpdateChecker.formatBytesMb(state.totalBytes)})",
-                                        color = AegisPrimaryCyan,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                } else {
-                                    LinearProgressIndicator(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp)
-                                            .clip(RoundedCornerShape(4.dp)),
-                                        color = AegisPrimaryCyan,
-                                        trackColor = AegisPrimaryCyan.copy(alpha = 0.2f)
-                                    )
-                                    Text(
-                                        text = "Downloading APK... ${UpdateChecker.formatBytesMb(state.bytesDownloaded)}",
-                                        color = AegisPrimaryCyan,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            is ApkDownloadState.ReadyToInstall -> {
-                                Text(
-                                    text = "APK downloaded! Tap Install APK to finish updating.",
-                                    color = AegisPrimaryCyan,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            is ApkDownloadState.Failed -> {
-                                Text(
-                                    text = state.message,
-                                    color = AegisWarningAmber,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            ApkDownloadState.Idle -> {}
-                        }
-                    }
-                },
-                confirmButton = {
-                    when (val state = apkDownloadState) {
-                        is ApkDownloadState.Downloading -> {
-                            OutlinedButton(onClick = { UpdateChecker.cancelApkDownload() }) {
-                                Text("CANCEL", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        is ApkDownloadState.ReadyToInstall -> {
-                            Button(
-                                onClick = {
-                                    val launched = UpdateChecker.installApk(context, state.apkFile)
-                                    if (!launched) {
-                                        Toast.makeText(
-                                            context,
-                                            "Allow 'Install unknown apps' permission, then tap Install again.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = AegisPurple)
-                            ) {
-                                Icon(imageVector = Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("INSTALL APK", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        else -> {
-                            val apkUrl = info.apkDownloadUrl
-                            if (!apkUrl.isNullOrBlank()) {
-                                Button(
-                                    onClick = { UpdateChecker.startApkDownload(context, apkUrl) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
-                                ) {
-                                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("DOWNLOAD APK", fontWeight = FontWeight.Bold)
-                                }
-                            } else {
-                                Button(
-                                    onClick = {
-                                        UpdateChecker.openReleaseUrl(context, info.releaseUrl)
-                                        UpdateChecker.dismissUpdatePrompt()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
-                                ) {
-                                    Text("OPEN RELEASE", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                },
-                dismissButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                UpdateChecker.openReleaseUrl(context, info.releaseUrl)
-                            }
-                        ) {
-                            Text("BROWSER", fontSize = 11.sp)
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                UpdateChecker.cancelApkDownload()
-                                UpdateChecker.dismissUpdatePrompt()
-                            }
-                        ) {
-                            Text("LATER", fontSize = 11.sp)
-                        }
-                    }
-                }
-            )
-        }
     }
 }

@@ -45,12 +45,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -83,7 +85,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.core.permissions.PermissionHelper
+import com.example.core.update.ApkDownloadState
+import com.example.core.update.UpdateChecker
 import com.example.data.preferences.AegisPreferences
 import com.example.data.repository.ProtectionRepository
 import com.example.detection.classifier.ModelImportResult
@@ -284,6 +289,157 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // 0. Automatic Startup Update Ready Banner (once detected, button goes straight to Download & Auto-Install)
+                item {
+                    val updateInfo by UpdateChecker.updateInfo.collectAsState()
+                    val apkDownloadState by UpdateChecker.apkDownloadState.collectAsState()
+                    val showBanner = updateInfo?.isUpdateAvailable == true &&
+                        apkDownloadState !is ApkDownloadState.Installed
+                    AnimatedVisibility(
+                        visible = showBanner,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        val info = updateInfo
+                        if (info != null) {
+                            val currentLabel = "v${UpdateChecker.cleanVersionTag(BuildConfig.VERSION_NAME)}"
+                            val latestLabel = "v${UpdateChecker.cleanVersionTag(info.latestVersion)}"
+                            CyberCard(
+                                borderColor = AegisGoldBorder,
+                                tone = CyberCardTone.GOLD,
+                                modifier = Modifier.testTag("home_update_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(AegisChampagneGold),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Download,
+                                                contentDescription = "Update available",
+                                                tint = AegisOnPrimaryWhite,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = "Update Available: $latestLabel",
+                                                color = AegisTextPrimary,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = ClassicalDisplayFont
+                                            )
+                                            Text(
+                                                text = when (val st = apkDownloadState) {
+                                                    is ApkDownloadState.Downloading -> {
+                                                        val pct = st.progress?.let { "${(it * 100).toInt()}%" } ?: "..."
+                                                        "Downloading in background ($pct)"
+                                                    }
+                                                    ApkDownloadState.Installing -> "Auto-installing update..."
+                                                    is ApkDownloadState.ReadyToInstall ->
+                                                        if (st.needsInstallPermission) "Allow unknown apps to finish install" else "App $currentLabel → $latestLabel"
+                                                    is ApkDownloadState.Failed -> st.message
+                                                    else -> "App $currentLabel → Latest $latestLabel"
+                                                },
+                                                color = AegisChampagneGold,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontFamily = ClassicalBodyFont
+                                            )
+                                        }
+                                    }
+
+                                    val apkUrl = info.apkDownloadUrl
+                                    when (val st = apkDownloadState) {
+                                        is ApkDownloadState.Downloading -> {
+                                            OutlinedButton(
+                                                onClick = { UpdateChecker.cancelApkDownload() },
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("CANCEL", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        ApkDownloadState.Installing -> {}
+                                        is ApkDownloadState.ReadyToInstall -> {
+                                            Button(
+                                                onClick = { UpdateChecker.autoInstallApk(context, st.apkFile) },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = AegisPurple,
+                                                    contentColor = AegisOnPrimaryWhite
+                                                ),
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("INSTALL", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        else -> {
+                                            Button(
+                                                onClick = {
+                                                    if (!apkUrl.isNullOrBlank()) {
+                                                        UpdateChecker.startApkDownload(context, apkUrl)
+                                                    } else {
+                                                        UpdateChecker.openReleaseUrl(context, info.releaseUrl)
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = AegisPrimaryCyan,
+                                                    contentColor = AegisOnPrimaryWhite
+                                                ),
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier
+                                                    .height(48.dp)
+                                                    .testTag("home_download_update_button")
+                                            ) {
+                                                Text("UPDATE", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (apkDownloadState is ApkDownloadState.Downloading) {
+                                    val st = apkDownloadState as ApkDownloadState.Downloading
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    if (st.progress != null) {
+                                        LinearProgressIndicator(
+                                            progress = { st.progress },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(3.dp)),
+                                            color = AegisPrimaryCyan,
+                                            trackColor = AegisPrimaryCyan.copy(alpha = 0.2f),
+                                            strokeCap = StrokeCap.Round
+                                        )
+                                    } else {
+                                        LinearProgressIndicator(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(3.dp)),
+                                            color = AegisPrimaryCyan,
+                                            trackColor = AegisPrimaryCyan.copy(alpha = 0.2f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 1. Eye-Comfort Spacious Animated Shield Widget
                 item {
                     CyberCard(

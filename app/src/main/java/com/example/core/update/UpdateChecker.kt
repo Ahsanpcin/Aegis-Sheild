@@ -1,13 +1,17 @@
 package com.example.core.update
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
+import com.example.di.AegisContainer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +29,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -46,7 +51,12 @@ sealed class ApkDownloadState {
         val bytesDownloaded: Long,
         val totalBytes: Long
     ) : ApkDownloadState()
-    data class ReadyToInstall(val apkFile: File) : ApkDownloadState()
+    data object Installing : ApkDownloadState()
+    data class ReadyToInstall(
+        val apkFile: File,
+        val needsInstallPermission: Boolean = false
+    ) : ApkDownloadState()
+    data object Installed : ApkDownloadState()
     data class Failed(val message: String) : ApkDownloadState()
 }
 
@@ -83,6 +93,9 @@ object UpdateChecker {
     @Volatile
     private var activeApkJob: Job? = null
 
+    @Volatile
+    private var pendingInstallApk: File? = null
+
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .followRedirects(true)
@@ -92,39 +105,83 @@ object UpdateChecker {
             .build()
     }
 
-    fun startCheckForUpdates() {
+    fun startCheckForUpdates(showUpToDatePopup: Boolean = true) {
         if (_isChecking.value) return
+        // Once an update is already found and an APK download/install is in flight, keep it undisturbed
+        if (_apkDownloadState.value is ApkDownloadState.Downloading ||
+            _apkDownloadState.value is ApkDownloadState.Installing
+        ) {
+            return
+        }
         activeCheckJob?.cancel()
         _isChecking.value = true
         _checkError.value = null
-        _showUpToDateDialog.value = false
-        if (_apkDownloadState.value !is ApkDownloadState.Downloading) {
-            _apkDownloadState.value = ApkDownloadState.Idle
+        if (!showUpToDatePopup) {
+            _showUpToDateDialog.value = false
         }
         activeCheckJob = updateScope.launch {
             val result = checkForUpdates()
             _isChecking.value = false
             result.onSuccess { info ->
                 _updateInfo.value = info
-                if (!info.isUpdateAvailable) {
+                if (!info.isUpdateAvailable && showUpToDatePopup) {
                     _showUpToDateDialog.value = true
                 }
             }.onFailure { err ->
-                _checkError.value = err.message ?: "Failed to check for updates"
+                if (showUpToDatePopup) {
+                    _checkError.value = err.message ?: "Failed to check for updates"
+                }
             }
         }
     }
 
     fun startApkDownload(context: Context, apkUrl: String) {
-        if (_apkDownloadState.value is ApkDownloadState.Downloading) return
+        if (_apkDownloadState.value is ApkDownloadState.Downloading ||
+            _apkDownloadState.value is ApkDownloadState.Installing
+        ) {
+            return
+        }
         val appContext = context.applicationContext
         activeApkJob?.cancel()
         activeApkJob = updateScope.launch {
+            AegisBackgroundDownloadService.notifyProgress(
+                context = appContext,
+                title = "Downloading Sheildlenz Update",
+                subtitle = "Connecting...",
+                progressPct = -1,
+                force = true
+            )
             val result = downloadApk(appContext, apkUrl) { state ->
                 _apkDownloadState.value = state
+                when (state) {
+                    is ApkDownloadState.Downloading -> {
+                        val pct = state.progress?.let { (it * 100).toInt().coerceIn(0, 100) } ?: -1
+                        val label = if (state.totalBytes > 0L) {
+                            "${formatBytesMb(state.bytesDownloaded)} / ${formatBytesMb(state.totalBytes)}"
+                        } else {
+                            formatBytesMb(state.bytesDownloaded)
+                        }
+                        AegisBackgroundDownloadService.notifyProgress(
+                            context = appContext,
+                            title = "Downloading Sheildlenz Update",
+                            subtitle = if (pct >= 0) "$pct% • $label" else label,
+                            progressPct = pct
+                        )
+                    }
+                    else -> {}
+                }
             }
             result.onSuccess { file ->
-                installApk(appContext, file)
+                AegisBackgroundDownloadService.notifyProgress(
+                    context = appContext,
+                    title = "Installing Sheildlenz Update",
+                    subtitle = "Finalizing update...",
+                    progressPct = -1,
+                    force = true
+                )
+                autoInstallApk(appContext, file)
+            }.onFailure {
+                AegisBackgroundDownloadService.stop(appContext)
             }
         }
     }
@@ -140,8 +197,9 @@ object UpdateChecker {
     }
 
     fun dismissUpdatePrompt() {
-        if (_apkDownloadState.value !is ApkDownloadState.Downloading) {
-            _updateInfo.value = null
+        if (_apkDownloadState.value !is ApkDownloadState.Downloading &&
+            _apkDownloadState.value !is ApkDownloadState.Installing
+        ) {
             _apkDownloadState.value = ApkDownloadState.Idle
         }
     }
@@ -268,10 +326,10 @@ object UpdateChecker {
         apkUrl: String,
         onStateChanged: (ApkDownloadState) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
-        val updatesDir = File(context.cacheDir, "updates").apply {
-            if (!exists()) mkdirs()
-        }
-        val apkFile = File(updatesDir, "sheildlenz-update.apk")
+        val updatesDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?.apply { if (!exists()) mkdirs() }
+            ?: File(context.cacheDir, "updates").apply { if (!exists()) mkdirs() }
+        val apkFile = File(updatesDir, "Sheildlenz-update.apk")
 
         try {
             onStateChanged(ApkDownloadState.Downloading(0f, 0L, -1L))
@@ -330,43 +388,140 @@ object UpdateChecker {
                 return@withContext Result.failure(Exception(msg))
             }
 
-            onStateChanged(ApkDownloadState.ReadyToInstall(apkFile))
+            pendingInstallApk = apkFile
+            onStateChanged(ApkDownloadState.ReadyToInstall(apkFile, needsInstallPermission = false))
             Result.success(apkFile)
         } catch (ce: CancellationException) {
+            AegisBackgroundDownloadService.stop(context)
             onStateChanged(ApkDownloadState.Idle)
             throw ce
         } catch (e: Exception) {
             Log.e(TAG, "Failed to download APK", e)
+            AegisBackgroundDownloadService.stop(context)
             val msg = e.message ?: "APK download failed"
             onStateChanged(ApkDownloadState.Failed(msg))
             Result.failure(e)
         }
     }
 
-    fun installApk(context: Context, apkFile: File): Boolean {
+    /**
+     * Automatically installs the downloaded APK using PackageInstaller.Session (silent in-place
+     * self-update on Android 12+ once unknown-app permission is enabled) without triggering
+     * Sheildlenz's Anti-Tamper password lock or deleting the file prematurely.
+     */
+    fun autoInstallApk(context: Context, apkFile: File): Boolean {
+        val appContext = context.applicationContext
+        pendingInstallApk = apkFile
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            AegisContainer.getInstance(appContext).preferences.grantTemporarySettingsAuthorization()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !appContext.packageManager.canRequestPackageInstalls()) {
+                _apkDownloadState.value = ApkDownloadState.ReadyToInstall(apkFile, needsInstallPermission = true)
+                AegisBackgroundDownloadService.stop(appContext)
                 val permIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = Uri.parse("package:${appContext.packageName}")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(permIntent)
+                appContext.startActivity(permIntent)
+                return false
+            }
+
+            _apkDownloadState.value = ApkDownloadState.Installing
+            val installer = appContext.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+                setAppPackageName(appContext.packageName)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                }
+            }
+
+            val sessionId = installer.createSession(params)
+            installer.openSession(sessionId).use { session ->
+                FileInputStream(apkFile).use { input ->
+                    session.openWrite("sheildlenz_update.apk", 0, apkFile.length()).use { output ->
+                        val buffer = ByteArray(32 * 1024)
+                        var read: Int
+                        while (input.read(buffer).also { read = it } != -1) {
+                            output.write(buffer, 0, read)
+                        }
+                        session.fsync(output)
+                    }
+                }
+
+                val callbackIntent = Intent(appContext, ApkInstallResultReceiver::class.java)
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+                val pendingIntent = PendingIntent.getBroadcast(appContext, sessionId, callbackIntent, flags)
+                session.commit(pendingIntent.intentSender)
+            }
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "PackageInstaller session failed; falling back to ACTION_VIEW installer", e)
+            installApk(appContext, apkFile)
+        }
+    }
+
+    fun retryPendingInstallIfAuthorized(context: Context) {
+        val state = _apkDownloadState.value
+        val file = pendingInstallApk
+            ?: (state as? ApkDownloadState.ReadyToInstall)?.apkFile
+            ?: return
+        if (!file.exists()) return
+        if (state is ApkDownloadState.ReadyToInstall && state.needsInstallPermission) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()) {
+                autoInstallApk(context, file)
+            }
+        }
+    }
+
+    fun fallbackViewInstallIfPending(context: Context): Boolean {
+        val file = pendingInstallApk ?: return false
+        if (!file.exists()) return false
+        return installApk(context, file)
+    }
+
+    fun onPackageInstallSucceeded(context: Context) {
+        pendingInstallApk = null
+        AegisBackgroundDownloadService.stop(context)
+        _apkDownloadState.value = ApkDownloadState.Installed
+    }
+
+    fun onPackageInstallFailed(message: String) {
+        _apkDownloadState.value = ApkDownloadState.Failed(message)
+    }
+
+    fun installApk(context: Context, apkFile: File): Boolean {
+        val appContext = context.applicationContext
+        pendingInstallApk = apkFile
+        return try {
+            AegisContainer.getInstance(appContext).preferences.grantTemporarySettingsAuthorization()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !appContext.packageManager.canRequestPackageInstalls()) {
+                _apkDownloadState.value = ApkDownloadState.ReadyToInstall(apkFile, needsInstallPermission = true)
+                AegisBackgroundDownloadService.stop(appContext)
+                val permIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${appContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                appContext.startActivity(permIntent)
                 return false
             }
 
             val apkUri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
+                appContext,
+                "${appContext.packageName}.fileprovider",
                 apkFile
             )
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(installIntent)
+            appContext.startActivity(installIntent)
+            AegisBackgroundDownloadService.stop(appContext)
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch APK installer", e)
+            AegisBackgroundDownloadService.stop(appContext)
             false
         }
     }

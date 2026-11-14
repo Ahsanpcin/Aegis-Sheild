@@ -226,12 +226,17 @@ class AegisAccessibilityService : AccessibilityService() {
                 return false
             }
 
-            // On dedicated installer/uninstaller or Device Admin confirmation screens, targeting Sheildlenz is unambiguous.
-            if (pkg.contains("packageinstaller") ||
-                cls.contains("uninstaller") ||
-                cls.contains("deviceadminadd")
-            ) {
+            // Uninstaller or Device Admin deactivation targeting Sheildlenz MUST always require password.
+            if (cls.contains("uninstaller") || cls.contains("deviceadminadd")) {
                 return true
+            }
+
+            // Inside Package Installer, ONLY block uninstall/remove actions — never block Sheildlenz self-update/install!
+            if (pkg.contains("packageinstaller")) {
+                val isUninstallAction = text.contains("uninstall") ||
+                    text.contains("remove this app") ||
+                    text.contains("delete this app")
+                return isUninstallAction
             }
 
             // On Settings/Permission screens (e.g., App Info vs Apps List), require a tamper action keyword alongside Sheildlenz.

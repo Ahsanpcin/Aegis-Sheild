@@ -68,15 +68,27 @@ jobs:
           echo "NEW_CODE=$NEW_CODE" >> "$GITHUB_ENV"
           echo "INCREMENT_LABEL=0.${INCREMENT}" >> "$GITHUB_ENV"
 
-          keytool -genkeypair \
-            -keystore "/tmp/release.jks" \
-            -alias upload \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass android \
-            -keypass android \
-            -dname "CN=Sheildlenz, OU=Android, O=Sheildlenz, L=Global, S=Global, C=US"
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "/tmp/release.jks"
+          elif [ -f "debug.keystore.base64" ]; then
+            base64 -d "debug.keystore.base64" > "/tmp/release.jks"
+            keytool -changealias \
+              -keystore "/tmp/release.jks" \
+              -alias androiddebugkey \
+              -destalias upload \
+              -storepass android \
+              -keypass android
+          else
+            keytool -genkeypair \
+              -keystore "/tmp/release.jks" \
+              -alias upload \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Sheildlenz, OU=Android, O=Sheildlenz, L=Global, S=Global, C=US"
+          fi
 
       - name: Build Release APK (Fast)
         run: gradle assembleRelease --build-cache --parallel --no-daemon -x lint -x test

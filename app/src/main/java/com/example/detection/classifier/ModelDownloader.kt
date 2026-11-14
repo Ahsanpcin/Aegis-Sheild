@@ -2,6 +2,7 @@ package com.example.detection.classifier
 
 import android.content.Context
 import android.util.Log
+import com.example.core.update.AegisBackgroundDownloadService
 import com.example.di.AegisContainer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -65,8 +66,8 @@ object ModelDownloader {
     }
 
     /**
-     * Launches a lifecycle-independent download in an application-wide SupervisorJob scope so
-     * switching tabs or leaving the screen never interrupts or cancels an active model download.
+     * Launches a lifecycle-independent download backed by a dataSync foreground service so
+     * switching tabs or minimizing the app never interrupts or cancels an active model download.
      */
     fun startDownload(
         context: Context,
@@ -76,21 +77,64 @@ object ModelDownloader {
     ) {
         val appContext = context.applicationContext
         activeDownloadJob?.cancel()
+        AegisBackgroundDownloadService.notifyProgress(
+            context = appContext,
+            title = "Downloading AI Model (Link $linkIndex)",
+            subtitle = "Starting download...",
+            progressPct = -1,
+            force = true
+        )
         activeDownloadJob = downloadScope.launch {
-            val result = downloadAndInstallZipModel(
-                context = appContext,
-                modelManager = modelManager,
-                linkIndex = linkIndex,
-                onStateChanged = { state -> _downloadState.value = state }
-            )
-            if (result is ModelImportResult.Success) {
-                try {
-                    AegisContainer.getInstance(appContext).refreshModelTelemetry()
-                } catch (_: Exception) {
+            try {
+                val result = downloadAndInstallZipModel(
+                    context = appContext,
+                    modelManager = modelManager,
+                    linkIndex = linkIndex,
+                    onStateChanged = { state ->
+                        _downloadState.value = state
+                        when (state) {
+                            is ModelDownloadState.Downloading -> {
+                                val pct = state.progress?.let { (it * 100).toInt().coerceIn(0, 100) } ?: -1
+                                AegisBackgroundDownloadService.notifyProgress(
+                                    context = appContext,
+                                    title = "Downloading AI Model (Link ${state.linkIndex})",
+                                    subtitle = if (pct >= 0) "$pct% • ${formatBytesMb(state.bytesDownloaded)}" else formatBytesMb(state.bytesDownloaded),
+                                    progressPct = pct
+                                )
+                            }
+                            ModelDownloadState.Extracting -> {
+                                AegisBackgroundDownloadService.notifyProgress(
+                                    context = appContext,
+                                    title = "Unzipping AI Model",
+                                    subtitle = "Extracting .tflite classifier...",
+                                    progressPct = -1,
+                                    force = true
+                                )
+                            }
+                            ModelDownloadState.Validating -> {
+                                AegisBackgroundDownloadService.notifyProgress(
+                                    context = appContext,
+                                    title = "Loading AI Model",
+                                    subtitle = "Activating offline classifier...",
+                                    progressPct = -1,
+                                    force = true
+                                )
+                            }
+                            else -> {}
+                        }
+                    }
+                )
+                if (result is ModelImportResult.Success) {
+                    try {
+                        AegisContainer.getInstance(appContext).refreshModelTelemetry()
+                    } catch (_: Exception) {
+                    }
                 }
-            }
-            withContext(Dispatchers.Main.immediate) {
-                onCompleted?.invoke()
+                withContext(Dispatchers.Main.immediate) {
+                    onCompleted?.invoke()
+                }
+            } finally {
+                AegisBackgroundDownloadService.stop(appContext)
             }
         }
     }
