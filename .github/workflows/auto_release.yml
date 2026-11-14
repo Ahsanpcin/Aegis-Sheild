@@ -58,15 +58,31 @@ jobs:
           git commit -m "Bump version to v${{ env.NEW_NAME }} (Code ${{ env.NEW_CODE }}) [skip ci]"
           git push
 
+      - name: Prepare Keystore for Release Signing
+        run: |
+          keytool -genkeypair -v \
+            -keystore "${{ github.workspace }}/release.jks" \
+            -alias upload \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Sheildlenz, OU=Android, O=Sheildlenz, L=Global, S=Global, C=US"
+
       - name: Build Release APK
-        run: gradle assembleRelease
+        run: gradle assembleRelease -x lint -x test
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
+          STORE_PASSWORD: android
+          KEY_PASSWORD: android
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.NEW_NAME }}
           name: Sheildlenz v${{ env.NEW_NAME }} (Build ${{ env.NEW_CODE }})
-          files: app/build/outputs/apk/release/app-release.apk
+          files: app/build/outputs/apk/release/*.apk
           body: |
             Automated release v${{ env.NEW_NAME }} (Code ${{ env.NEW_CODE }}).
         env:

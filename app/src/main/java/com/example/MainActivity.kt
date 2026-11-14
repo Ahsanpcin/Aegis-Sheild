@@ -1,5 +1,6 @@
 package com.example
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
     private val container by lazy { AegisContainer.getInstance(this) }
     private var promptedShieldRearmInSession = false
 
+    @SuppressLint("InvalidFragmentVersionForActivityResult")
     private val mediaProjectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
