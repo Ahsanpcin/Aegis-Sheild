@@ -2,10 +2,18 @@ package com.example.detection.classifier
 
 import android.content.Context
 import android.util.Log
+import com.example.di.AegisContainer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -39,6 +47,14 @@ object ModelDownloader {
     const val FALLBACK_MODEL_ZIP_URL =
         "https://www.dropbox.com/scl/fi/zwcxynldkwwo5t41qhbm5/nsfw_mobilenet_v2_140_224-1.zip?rlkey=s6lc435o0p5zporzfx4g7vn8x&st=7u23fjj4&dl=1"
 
+    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _downloadState = MutableStateFlow<ModelDownloadState>(ModelDownloadState.Idle)
+    val downloadState: StateFlow<ModelDownloadState> = _downloadState.asStateFlow()
+
+    @Volatile
+    private var activeDownloadJob: Job? = null
+
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .followRedirects(true)
@@ -46,6 +62,52 @@ object ModelDownloader {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
+    }
+
+    /**
+     * Launches a lifecycle-independent download in an application-wide SupervisorJob scope so
+     * switching tabs or leaving the screen never interrupts or cancels an active model download.
+     */
+    fun startDownload(
+        context: Context,
+        modelManager: ModelManager,
+        linkIndex: Int = 1,
+        onCompleted: (() -> Unit)? = null
+    ) {
+        val appContext = context.applicationContext
+        activeDownloadJob?.cancel()
+        activeDownloadJob = downloadScope.launch {
+            val result = downloadAndInstallZipModel(
+                context = appContext,
+                modelManager = modelManager,
+                linkIndex = linkIndex,
+                onStateChanged = { state -> _downloadState.value = state }
+            )
+            if (result is ModelImportResult.Success) {
+                try {
+                    AegisContainer.getInstance(appContext).refreshModelTelemetry()
+                } catch (_: Exception) {
+                }
+            }
+            withContext(Dispatchers.Main.immediate) {
+                onCompleted?.invoke()
+            }
+        }
+    }
+
+    fun cancelDownload() {
+        activeDownloadJob?.cancel()
+        activeDownloadJob = null
+        _downloadState.value = ModelDownloadState.Idle
+    }
+
+    fun clearState() {
+        if (_downloadState.value !is ModelDownloadState.Downloading &&
+            _downloadState.value !is ModelDownloadState.Extracting &&
+            _downloadState.value !is ModelDownloadState.Validating
+        ) {
+            _downloadState.value = ModelDownloadState.Idle
+        }
     }
 
     suspend fun downloadAndInstallZipModel(

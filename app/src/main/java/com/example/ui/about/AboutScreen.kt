@@ -46,11 +46,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,8 +92,6 @@ import com.example.ui.theme.AegisTextSecondary
 import com.example.ui.theme.AegisWarningAmber
 import com.example.ui.theme.ClassicalBodyFont
 import com.example.ui.theme.ClassicalDisplayFont
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 private data class FaqEntry(
     val question: String,
@@ -332,13 +329,16 @@ fun AboutScreen(
 @Composable
 private fun AppUpdateCheckerCard() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var isChecking by remember { mutableStateOf(false) }
-    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
-    var showUpToDateDialog by remember { mutableStateOf(false) }
-    var checkError by remember { mutableStateOf<String?>(null) }
-    var apkDownloadState by remember { mutableStateOf<ApkDownloadState>(ApkDownloadState.Idle) }
-    var downloadJob by remember { mutableStateOf<Job?>(null) }
+    val isChecking by UpdateChecker.isChecking.collectAsState()
+    val updateInfo by UpdateChecker.updateInfo.collectAsState()
+    val showUpToDateDialog by UpdateChecker.showUpToDateDialog.collectAsState()
+    val checkError by UpdateChecker.checkError.collectAsState()
+    val apkDownloadState by UpdateChecker.apkDownloadState.collectAsState()
+
+    val currentLabel = "v${UpdateChecker.cleanVersionTag(BuildConfig.VERSION_NAME)}"
+    val latestLabel = updateInfo?.let { info ->
+        "v${UpdateChecker.cleanVersionTag(info.latestVersion)}"
+    } ?: "Not checked"
 
     CyberCard(
         borderColor = AegisLavenderBorder,
@@ -379,7 +379,7 @@ private fun AppUpdateCheckerCard() {
                         fontFamily = ClassicalDisplayFont
                     )
                     Text(
-                        text = "Ahsanpcin/Sheild-Lenz • GitHub Releases",
+                        text = "Latest Version vs App Version",
                         color = AegisTextSecondary,
                         fontSize = 11.sp,
                         fontFamily = ClassicalBodyFont
@@ -388,26 +388,70 @@ private fun AppUpdateCheckerCard() {
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Crisp Latest Version vs App Version comparison strip
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(AegisLavenderSoft.copy(alpha = 0.72f))
+                .border(1.dp, AegisLavenderBorder, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "APP VERSION",
+                    color = AegisTextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalBodyFont
+                )
+                Text(
+                    text = currentLabel,
+                    color = AegisTextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalDisplayFont
+                )
+            }
+
+            Text(
+                text = "vs",
+                color = AegisPurple,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = ClassicalBodyFont
+            )
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "LATEST VERSION",
+                    color = AegisTextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalBodyFont
+                )
+                Text(
+                    text = latestLabel,
+                    color = when {
+                        updateInfo?.isUpdateAvailable == true -> AegisChampagneGold
+                        updateInfo != null -> AegisPrimaryCyan
+                        else -> AegisTextSecondary
+                    },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalDisplayFont
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
-            onClick = {
-                isChecking = true
-                checkError = null
-                apkDownloadState = ApkDownloadState.Idle
-                scope.launch {
-                    val result = UpdateChecker.checkForUpdates()
-                    isChecking = false
-                    result.onSuccess { info ->
-                        updateInfo = info
-                        if (!info.isUpdateAvailable) {
-                            showUpToDateDialog = true
-                        }
-                    }.onFailure { err ->
-                        checkError = err.message ?: "Failed to check for updates"
-                    }
-                }
-            },
+            onClick = { UpdateChecker.startCheckForUpdates() },
             enabled = !isChecking,
             colors = ButtonDefaults.buttonColors(
                 containerColor = AegisPrimaryCyan,
@@ -422,7 +466,7 @@ private fun AppUpdateCheckerCard() {
             if (isChecking) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AegisOnPrimaryWhite, strokeWidth = 2.dp)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("CHECKING GITHUB...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("CHECKING VERSION...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             } else {
                 Icon(imageVector = Icons.Default.Update, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -442,12 +486,17 @@ private fun AppUpdateCheckerCard() {
 
     if (showUpToDateDialog) {
         AlertDialog(
-            onDismissRequest = { showUpToDateDialog = false },
+            onDismissRequest = { UpdateChecker.dismissUpToDateDialog() },
             containerColor = AegisLavenderSoft,
             title = { Text("App is Up to Date", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
-            text = { Text("You are running the latest version (${BuildConfig.VERSION_NAME}) of Sheildlenz.", fontFamily = ClassicalBodyFont) },
+            text = {
+                Text(
+                    "App Version: $currentLabel\nLatest Version: $latestLabel\n\nYou are already on the newest version.",
+                    fontFamily = ClassicalBodyFont
+                )
+            },
             confirmButton = {
-                Button(onClick = { showUpToDateDialog = false }) {
+                Button(onClick = { UpdateChecker.dismissUpToDateDialog() }) {
                     Text("OK", fontWeight = FontWeight.Bold)
                 }
             }
@@ -459,14 +508,26 @@ private fun AppUpdateCheckerCard() {
             AlertDialog(
                 onDismissRequest = {
                     if (apkDownloadState !is ApkDownloadState.Downloading) {
-                        updateInfo = null
+                        UpdateChecker.dismissUpdatePrompt()
                     }
                 },
                 containerColor = AegisChampagneSoft,
-                title = { Text("New Version Available (${info.latestVersion})", fontFamily = ClassicalDisplayFont, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "New Version Available ($latestLabel)",
+                        fontFamily = ClassicalDisplayFont,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Current version: v${info.currentVersion}", color = AegisTextSecondary, fontSize = 12.sp, fontFamily = ClassicalBodyFont)
+                        Text(
+                            "App Version: $currentLabel  →  Latest Version: $latestLabel",
+                            color = AegisTextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = ClassicalBodyFont
+                        )
                         if (info.apkSizeBytes > 0L) {
                             Text(
                                 text = "APK Package Size: ${UpdateChecker.formatBytesMb(info.apkSizeBytes)}",
@@ -476,7 +537,12 @@ private fun AppUpdateCheckerCard() {
                                 fontFamily = ClassicalBodyFont
                             )
                         }
-                        Text("Release Notes:\n${info.releaseNotes ?: "Bug fixes and improvements"}", color = AegisTextPrimary, fontSize = 12.sp, fontFamily = ClassicalBodyFont)
+                        Text(
+                            "Release Notes:\n${info.releaseNotes ?: "Bug fixes and improvements"}",
+                            color = AegisTextPrimary,
+                            fontSize = 12.sp,
+                            fontFamily = ClassicalBodyFont
+                        )
 
                         when (val state = apkDownloadState) {
                             is ApkDownloadState.Downloading -> {
@@ -539,12 +605,7 @@ private fun AppUpdateCheckerCard() {
                 confirmButton = {
                     when (val state = apkDownloadState) {
                         is ApkDownloadState.Downloading -> {
-                            OutlinedButton(
-                                onClick = {
-                                    downloadJob?.cancel()
-                                    apkDownloadState = ApkDownloadState.Idle
-                                }
-                            ) {
+                            OutlinedButton(onClick = { UpdateChecker.cancelApkDownload() }) {
                                 Text("CANCEL", fontWeight = FontWeight.Bold)
                             }
                         }
@@ -571,23 +632,7 @@ private fun AppUpdateCheckerCard() {
                             val apkUrl = info.apkDownloadUrl
                             if (!apkUrl.isNullOrBlank()) {
                                 Button(
-                                    onClick = {
-                                        downloadJob = scope.launch {
-                                            val result = UpdateChecker.downloadApk(context, apkUrl) { newState ->
-                                                apkDownloadState = newState
-                                            }
-                                            result.onSuccess { file ->
-                                                val launched = UpdateChecker.installApk(context, file)
-                                                if (!launched) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Grant install permission and tap INSTALL APK.",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                }
-                                            }
-                                        }
-                                    },
+                                    onClick = { UpdateChecker.startApkDownload(context, apkUrl) },
                                     colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
                                 ) {
                                     Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -598,7 +643,7 @@ private fun AppUpdateCheckerCard() {
                                 Button(
                                     onClick = {
                                         UpdateChecker.openReleaseUrl(context, info.releaseUrl)
-                                        updateInfo = null
+                                        UpdateChecker.dismissUpdatePrompt()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = AegisPrimaryCyan)
                                 ) {
@@ -619,9 +664,8 @@ private fun AppUpdateCheckerCard() {
                         }
                         OutlinedButton(
                             onClick = {
-                                downloadJob?.cancel()
-                                apkDownloadState = ApkDownloadState.Idle
-                                updateInfo = null
+                                UpdateChecker.cancelApkDownload()
+                                UpdateChecker.dismissUpdatePrompt()
                             }
                         ) {
                             Text("LATER", fontSize = 11.sp)

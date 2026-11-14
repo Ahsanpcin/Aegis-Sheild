@@ -35,6 +35,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,7 +96,7 @@ fun ModelManagerCard(
     onModelUpdated: () -> Unit,
     modifier: Modifier = Modifier,
     cardTone: CyberCardTone? = null,
-    showCloudDownloader: Boolean = false,
+    showCloudDownloader: Boolean = true,
     onBeforeOpenPicker: () -> Unit = {},
     onRequireAuth: (actionLabel: String, onAuthorized: () -> Unit) -> Unit = { _, action -> action() }
 ) {
@@ -103,28 +104,19 @@ fun ModelManagerCard(
     val scope = rememberCoroutineScope()
     var isImporting by remember { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
-    var downloadState by remember { mutableStateOf<ModelDownloadState>(ModelDownloadState.Idle) }
-    var downloadJob by remember { mutableStateOf<Job?>(null) }
+    val downloadState by ModelDownloader.downloadState.collectAsState()
     val isDownloadingOrUnzipping = downloadState is ModelDownloadState.Downloading ||
         downloadState is ModelDownloadState.Extracting ||
         downloadState is ModelDownloadState.Validating
 
     val startCloudDownload: (Int) -> Unit = { linkIndex ->
         localError = null
-        downloadJob = scope.launch {
-            val result = ModelDownloader.downloadAndInstallZipModel(
-                context = context,
-                modelManager = modelManager,
-                linkIndex = linkIndex,
-                onStateChanged = { state -> downloadState = state }
-            )
-            if (result is ModelImportResult.Success) {
-                localError = null
-                onModelUpdated()
-            } else if (result is ModelImportResult.Failure) {
-                onModelUpdated()
-            }
-        }
+        ModelDownloader.startDownload(
+            context = context,
+            modelManager = modelManager,
+            linkIndex = linkIndex,
+            onCompleted = { onModelUpdated() }
+        )
     }
 
     val modelPickerLauncher = rememberLauncherForActivityResult(
@@ -394,8 +386,7 @@ fun ModelManagerCard(
             Button(
                 onClick = {
                     if (isDownloadingOrUnzipping) {
-                        downloadJob?.cancel()
-                        downloadState = ModelDownloadState.Idle
+                        ModelDownloader.cancelDownload()
                     } else if (telemetry.isModelLoaded) {
                         onRequireAuth("download & replace AI model") {
                             startCloudDownload(1)
@@ -424,14 +415,52 @@ fun ModelManagerCard(
                 Text(
                     text = when {
                         isDownloadingOrUnzipping -> "CANCEL DOWNLOAD"
-                        telemetry.isModelLoaded -> "DOWNLOAD / REFRESH MODEL (.ZIP)"
-                        else -> "DOWNLOAD AI MODEL (.ZIP)"
+                        telemetry.isModelLoaded -> "REFRESH MODEL (LINK 1 • GITHUB)"
+                        else -> "DOWNLOAD AI MODEL (LINK 1)"
                     },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = ClassicalBodyFont,
                     letterSpacing = 0.6.sp
                 )
+            }
+
+            if (!isDownloadingOrUnzipping) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (telemetry.isModelLoaded) {
+                            onRequireAuth("download AI model from Link 2") {
+                                startCloudDownload(2)
+                            }
+                        } else {
+                            startCloudDownload(2)
+                        }
+                    },
+                    enabled = !isImporting,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = AegisChampagneSoft.copy(alpha = 0.55f),
+                        contentColor = AegisChampagneGold
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("download_tflite_link2_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "DOWNLOAD VIA LINK 2 (DROPBOX MIRROR)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = ClassicalBodyFont
+                    )
+                }
             }
 
             val failedState = downloadState as? ModelDownloadState.Failed
@@ -474,7 +503,7 @@ fun ModelManagerCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp)
-                                .testTag("download_tflite_link2_button")
+                                .testTag("download_tflite_retry_button")
                         ) {
                             Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -554,7 +583,7 @@ fun ModelManagerCard(
                         onRequireAuth("remove AI model") {
                             modelManager.clearImportedModel()
                             localError = null
-                            downloadState = ModelDownloadState.Idle
+                            ModelDownloader.clearState()
                             onModelUpdated()
                         }
                     },

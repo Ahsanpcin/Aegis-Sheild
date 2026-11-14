@@ -8,6 +8,7 @@ import com.example.ui.components.AHSAN_TCR_CONTACT_DOMAIN
 import com.example.ui.components.AHSAN_TCR_CONTACT_URL
 import com.example.ui.components.MasterKeyGateState
 import com.example.ui.components.openAhsanTcrContact
+import com.example.core.models.EngineTelemetry
 import com.example.core.models.SecurityIncident
 import com.example.core.models.SensitivityLevel
 import com.example.core.models.ThreatCategory
@@ -27,6 +28,7 @@ import com.example.detection.decision.ThreatDecisionEngine
 import com.example.detection.preprocessing.FramePreprocessor
 import com.example.monitoring.accessibility.AegisAccessibilityService
 import com.example.security.deviceowner.AegisDeviceAdminReceiver
+import com.example.services.protection.AegisProtectionService
 import com.example.ui.history.buildAuditReportText
 import com.example.ui.navigation.isStartupGuardianAuthorized
 import org.json.JSONArray
@@ -486,7 +488,8 @@ class ExampleRobolectricTest {
         prefs.resetAdvancedCustomizations()
         assertEquals(600, prefs.lockdownDurationMinutes.value)
         assertEquals(2.0f, prefs.doubleTimeMultiplier.value)
-        assertEquals(300, prefs.scanIntervalMs.value)
+        assertEquals(350, prefs.scanIntervalMs.value)
+        assertEquals(PowerMode.ADAPTIVE_ECO, prefs.powerMode.value)
     }
 
     @Test
@@ -712,10 +715,11 @@ class ExampleRobolectricTest {
 
         prefs.setPowerMode(PowerMode.POWER_SAVING)
         assertEquals(PowerMode.POWER_SAVING, prefs.powerMode.value)
-        assertEquals(650, prefs.scanIntervalMs.value)
-        assertEquals(320, prefs.captureWidthPx.value)
+        assertEquals(750, prefs.scanIntervalMs.value)
+        assertEquals(256, prefs.captureWidthPx.value)
         assertTrue(prefs.skipDuplicateFrames.value)
         assertTrue(prefs.pauseWhenScreenOff.value)
+        assertTrue(prefs.adaptiveCadenceEnabled.value)
 
         prefs.setPowerMode(PowerMode.EXTREME)
         assertEquals(PowerMode.EXTREME, prefs.powerMode.value)
@@ -723,20 +727,25 @@ class ExampleRobolectricTest {
         assertEquals(640, prefs.captureWidthPx.value)
         assertFalse(prefs.skipDuplicateFrames.value)
         assertFalse(prefs.pauseWhenScreenOff.value)
+        assertFalse(prefs.adaptiveCadenceEnabled.value)
 
         // Granular power-saving options toggle cleanly
         prefs.setCompactPowerResolution(true)
-        assertEquals(320, prefs.captureWidthPx.value)
+        assertEquals(256, prefs.captureWidthPx.value)
         prefs.setPauseWhenScreenOff(true)
         assertTrue(prefs.pauseWhenScreenOff.value)
+        prefs.setAutoThrottleLowBattery(false)
+        assertFalse(prefs.autoThrottleLowBattery.value)
 
-        // Reset restores Balanced defaults
+        // Reset restores Adaptive Eco defaults
         prefs.resetAdvancedCustomizations()
-        assertEquals(PowerMode.BALANCED, prefs.powerMode.value)
-        assertEquals(300, prefs.scanIntervalMs.value)
-        assertEquals(480, prefs.captureWidthPx.value)
+        assertEquals(PowerMode.ADAPTIVE_ECO, prefs.powerMode.value)
+        assertEquals(350, prefs.scanIntervalMs.value)
+        assertEquals(256, prefs.captureWidthPx.value)
         assertTrue(prefs.skipDuplicateFrames.value)
         assertTrue(prefs.pauseWhenScreenOff.value)
+        assertTrue(prefs.adaptiveCadenceEnabled.value)
+        assertTrue(prefs.autoThrottleLowBattery.value)
     }
 
     @Test
@@ -950,6 +959,120 @@ class ExampleRobolectricTest {
         assertEquals("9:00 PM", AegisPreferences.formatClockTime(21 * 60))
         assertEquals("7:00 AM", AegisPreferences.formatClockTime(7 * 60))
         assertEquals("12:00 AM", AegisPreferences.formatClockTime(0))
+    }
+
+    @Test
+    fun `adaptive eco cadence steps down on idle screens and auto-throttles below 20 percent battery`() {
+        // Active frames keep responsive base interval (350ms)
+        val (activeMs, lowActive) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = 350,
+            adaptiveEnabled = true,
+            consecutiveIdleOrSafeCount = 1,
+            autoThrottleLowBattery = true,
+            batteryPercent = 80,
+            isCharging = false,
+            isPowerSaveMode = false,
+            wasLowBatteryThrottled = false
+        )
+        assertEquals(350, activeMs)
+        assertFalse(lowActive)
+
+        // Consecutive unchanged screens step interval down cleanly
+        val (idleMs, _) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = 350,
+            adaptiveEnabled = true,
+            consecutiveIdleOrSafeCount = 15,
+            autoThrottleLowBattery = true,
+            batteryPercent = 80,
+            isCharging = false,
+            isPowerSaveMode = false,
+            wasLowBatteryThrottled = false
+        )
+        assertEquals(1575, idleMs)
+
+        // Battery drops to 19% unplugged -> low-battery throttle activates (>=1000ms floor)
+        val (throttledMs, isThrottled19) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = 350,
+            adaptiveEnabled = true,
+            consecutiveIdleOrSafeCount = 0,
+            autoThrottleLowBattery = true,
+            batteryPercent = 19,
+            isCharging = false,
+            isPowerSaveMode = false,
+            wasLowBatteryThrottled = false
+        )
+        assertTrue(isThrottled19)
+        assertTrue(throttledMs >= 1000)
+
+        // Hysteresis keeps throttle engaged at 21%, releases at 22%, and immediately releases when charging
+        val (_, stillThrottled21) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = 350,
+            adaptiveEnabled = true,
+            consecutiveIdleOrSafeCount = 0,
+            autoThrottleLowBattery = true,
+            batteryPercent = 21,
+            isCharging = false,
+            isPowerSaveMode = false,
+            wasLowBatteryThrottled = true
+        )
+        assertTrue(stillThrottled21)
+
+        val (releasedMs22, released22) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = 350,
+            adaptiveEnabled = true,
+            consecutiveIdleOrSafeCount = 0,
+            autoThrottleLowBattery = true,
+            batteryPercent = 22,
+            isCharging = false,
+            isPowerSaveMode = false,
+            wasLowBatteryThrottled = true
+        )
+        assertFalse(released22)
+        assertEquals(350, releasedMs22)
+
+        val (chargingMs, throttledCharging) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = 350,
+            adaptiveEnabled = true,
+            consecutiveIdleOrSafeCount = 0,
+            autoThrottleLowBattery = true,
+            batteryPercent = 12,
+            isCharging = true,
+            isPowerSaveMode = true,
+            wasLowBatteryThrottled = true
+        )
+        assertFalse(throttledCharging)
+        assertEquals(350, chargingMs)
+    }
+
+    @Test
+    fun `perceptual luma skip ignores minor shimmer but triggers on real visual changes`() {
+        val preprocessor = FramePreprocessor(224, 224)
+        val frame1 = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        frame1.eraseColor(android.graphics.Color.rgb(40, 80, 120))
+        assertFalse(preprocessor.isFrameDuplicate(frame1))
+
+        // Tiny ambient change (+2 RGB) is treated as static to save battery
+        val nearStatic = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        nearStatic.eraseColor(android.graphics.Color.rgb(42, 82, 121))
+        assertTrue(preprocessor.isFrameDuplicate(nearStatic))
+
+        // Real visual scene change must trigger inspection immediately
+        val sceneChange = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        sceneChange.eraseColor(android.graphics.Color.rgb(220, 210, 200))
+        assertFalse(preprocessor.isFrameDuplicate(sceneChange))
+
+        preprocessor.recyclePools()
+    }
+
+    @Test
+    fun `zero cost skip packages and telemetry eco percentage calculate accurately`() {
+        assertTrue(AegisProtectionService.isZeroCostSkipPackage("com.ahsan.tcr.sheildlenz", "com.ahsan.tcr.sheildlenz"))
+        assertTrue(AegisProtectionService.isZeroCostSkipPackage("com.android.systemui", "com.ahsan.tcr.sheildlenz"))
+        assertTrue(AegisProtectionService.isZeroCostSkipPackage("com.google.android.apps.nexuslauncher", "com.ahsan.tcr.sheildlenz"))
+        assertFalse(AegisProtectionService.isZeroCostSkipPackage("com.android.chrome", "com.ahsan.tcr.sheildlenz"))
+
+        val telemetry = EngineTelemetry(framesProcessedCount = 30L, framesSkippedCount = 70L)
+        assertEquals(70, telemetry.ecoSavedPercent())
     }
 }
 

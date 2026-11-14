@@ -74,14 +74,16 @@ class AegisAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 4. Track active monitored foreground application
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            pkgName != packageName &&
-            pkgName != "com.android.systemui" &&
-            !pkgName.contains("inputmethod")
-        ) {
-            val appLabel = getAppLabel(pkgName)
-            container.protectionRepository.updateActivePackage(pkgName, appLabel)
+        // 4. Track active monitored foreground application & wake adaptive scan cadence
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            container.protectionRepository.notifyScreenContextChanged()
+            if (pkgName != packageName &&
+                pkgName != "com.android.systemui" &&
+                !pkgName.contains("inputmethod")
+            ) {
+                val appLabel = getAppLabel(pkgName)
+                container.protectionRepository.updateActivePackage(pkgName, appLabel)
+            }
         }
     }
 

@@ -574,6 +574,7 @@ fun DashboardScreen(
                             modelManager = modelManager,
                             onModelUpdated = onModelUpdated,
                             cardTone = CyberCardTone.GOLD,
+                            showCloudDownloader = true,
                             onBeforeOpenPicker = { preferences.beginAuthorizedExternalFlow() },
                             onRequireAuth = { label, action ->
                                 masterKeyGate.request(label) { action() }

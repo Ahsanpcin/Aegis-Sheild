@@ -9,9 +9,16 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -51,7 +58,30 @@ object UpdateChecker {
     private const val GITHUB_LATEST_RELEASE_URL =
         "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
     private const val GITHUB_ALL_RELEASES_URL =
-        "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases?per_page=10"
+        "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases?per_page=20"
+
+    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _isChecking = MutableStateFlow(false)
+    val isChecking: StateFlow<Boolean> = _isChecking.asStateFlow()
+
+    private val _checkError = MutableStateFlow<String?>(null)
+    val checkError: StateFlow<String?> = _checkError.asStateFlow()
+
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+
+    private val _showUpToDateDialog = MutableStateFlow(false)
+    val showUpToDateDialog: StateFlow<Boolean> = _showUpToDateDialog.asStateFlow()
+
+    private val _apkDownloadState = MutableStateFlow<ApkDownloadState>(ApkDownloadState.Idle)
+    val apkDownloadState: StateFlow<ApkDownloadState> = _apkDownloadState.asStateFlow()
+
+    @Volatile
+    private var activeCheckJob: Job? = null
+
+    @Volatile
+    private var activeApkJob: Job? = null
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -62,49 +92,137 @@ object UpdateChecker {
             .build()
     }
 
+    fun startCheckForUpdates() {
+        if (_isChecking.value) return
+        activeCheckJob?.cancel()
+        _isChecking.value = true
+        _checkError.value = null
+        _showUpToDateDialog.value = false
+        if (_apkDownloadState.value !is ApkDownloadState.Downloading) {
+            _apkDownloadState.value = ApkDownloadState.Idle
+        }
+        activeCheckJob = updateScope.launch {
+            val result = checkForUpdates()
+            _isChecking.value = false
+            result.onSuccess { info ->
+                _updateInfo.value = info
+                if (!info.isUpdateAvailable) {
+                    _showUpToDateDialog.value = true
+                }
+            }.onFailure { err ->
+                _checkError.value = err.message ?: "Failed to check for updates"
+            }
+        }
+    }
+
+    fun startApkDownload(context: Context, apkUrl: String) {
+        if (_apkDownloadState.value is ApkDownloadState.Downloading) return
+        val appContext = context.applicationContext
+        activeApkJob?.cancel()
+        activeApkJob = updateScope.launch {
+            val result = downloadApk(appContext, apkUrl) { state ->
+                _apkDownloadState.value = state
+            }
+            result.onSuccess { file ->
+                installApk(appContext, file)
+            }
+        }
+    }
+
+    fun cancelApkDownload() {
+        activeApkJob?.cancel()
+        activeApkJob = null
+        _apkDownloadState.value = ApkDownloadState.Idle
+    }
+
+    fun dismissUpToDateDialog() {
+        _showUpToDateDialog.value = false
+    }
+
+    fun dismissUpdatePrompt() {
+        if (_apkDownloadState.value !is ApkDownloadState.Downloading) {
+            _updateInfo.value = null
+            _apkDownloadState.value = ApkDownloadState.Idle
+        }
+    }
+
     suspend fun checkForUpdates(): Result<UpdateInfo> = withContext(Dispatchers.IO) {
         try {
-            val latestResult = fetchReleaseJson(GITHUB_LATEST_RELEASE_URL)
-            val releaseObj: JSONObject = if (latestResult.code == 200 && latestResult.body != null) {
-                JSONObject(latestResult.body)
-            } else if (latestResult.code == 404) {
-                // Fallback to all releases list in case latest release is tagged as pre-release or /latest isn't indexed yet
-                val allResult = fetchReleaseJson(GITHUB_ALL_RELEASES_URL)
-                if (allResult.code != 200 || allResult.body == null) {
-                    return@withContext Result.failure(
-                        Exception("No releases found on GitHub ($GITHUB_OWNER/$GITHUB_REPO) • HTTP ${allResult.code}")
-                    )
-                }
+            val candidates = mutableListOf<JSONObject>()
+
+            val allResult = fetchReleaseJson(GITHUB_ALL_RELEASES_URL)
+            if (allResult.code == 200 && allResult.body != null) {
                 val releasesArray = JSONArray(allResult.body)
-                var firstValid: JSONObject? = null
                 for (i in 0 until releasesArray.length()) {
-                    val candidate = releasesArray.optJSONObject(i) ?: continue
-                    if (!candidate.optBoolean("draft", false)) {
-                        firstValid = candidate
-                        break
+                    val item = releasesArray.optJSONObject(i) ?: continue
+                    if (!item.optBoolean("draft", false)) {
+                        candidates.add(item)
                     }
                 }
-                firstValid ?: return@withContext Result.success(
+            }
+
+            if (candidates.isEmpty()) {
+                val latestResult = fetchReleaseJson(GITHUB_LATEST_RELEASE_URL)
+                if (latestResult.code == 200 && latestResult.body != null) {
+                    val obj = JSONObject(latestResult.body)
+                    if (!obj.optBoolean("draft", false)) {
+                        candidates.add(obj)
+                    }
+                } else if (allResult.code != 200) {
+                    val errCode = if (latestResult.code == 404) allResult.code else latestResult.code
+                    return@withContext Result.failure(
+                        Exception("No releases found on GitHub ($GITHUB_OWNER/$GITHUB_REPO) • HTTP $errCode")
+                    )
+                }
+            }
+
+            if (candidates.isEmpty()) {
+                return@withContext Result.success(
                     UpdateInfo(
                         isUpdateAvailable = false,
-                        latestVersion = BuildConfig.VERSION_NAME,
+                        latestVersion = "v${BuildConfig.VERSION_NAME}",
                         currentVersion = BuildConfig.VERSION_NAME,
                         releaseUrl = GITHUB_RELEASES_WEB_URL,
                         releaseNotes = null
                     )
                 )
-            } else {
-                return@withContext Result.failure(
-                    Exception("GitHub API returned status ${latestResult.code}")
-                )
             }
 
-            val info = parseReleaseJson(releaseObj, BuildConfig.VERSION_NAME)
+            // Prefer APK-bearing releases so model-only releases (like v1.0.0) never mask newer app versions,
+            // and compare strictly by version number to identify the true latest release.
+            val apkCandidates = candidates.filter { hasApkAsset(it) }
+            val pool = if (apkCandidates.isNotEmpty()) apkCandidates else candidates
+            val bestRelease = pool.maxWithOrNull { a, b ->
+                val verA = cleanVersionTag(a.optString("tag_name", ""))
+                val verB = cleanVersionTag(b.optString("tag_name", ""))
+                compareVersions(verA, verB)
+            } ?: candidates.first()
+
+            val info = parseReleaseJson(bestRelease, BuildConfig.VERSION_NAME)
             Result.success(info)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to check for updates", e)
             Result.failure(e)
         }
+    }
+
+    private fun hasApkAsset(json: JSONObject): Boolean {
+        val assets = json.optJSONArray("assets") ?: return false
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            val assetName = asset.optString("name", "")
+            val downloadUrl = asset.optString("browser_download_url", "")
+            if (assetName.endsWith(".apk", ignoreCase = true) && downloadUrl.isNotBlank()) {
+                return true
+            }
+        }
+        return false
+    }
+
+    internal fun cleanVersionTag(raw: String): String {
+        val trimmed = raw.trim()
+        val match = Regex("(\\d+(?:\\.\\d+)*)").find(trimmed)
+        return match?.value ?: trimmed.removePrefix("v").removePrefix("V").trim()
     }
 
     internal fun parseReleaseJson(json: JSONObject, currentVersionName: String): UpdateInfo {
@@ -130,8 +248,8 @@ object UpdateChecker {
             }
         }
 
-        val latestClean = tagName.removePrefix("v").removePrefix("V").trim()
-        val currentClean = currentVersionName.removePrefix("v").removePrefix("V").trim()
+        val latestClean = cleanVersionTag(tagName)
+        val currentClean = cleanVersionTag(currentVersionName)
         val isNewer = compareVersions(latestClean, currentClean) > 0
 
         return UpdateInfo(
@@ -260,6 +378,8 @@ object UpdateChecker {
             .url(urlString)
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "Sheildlenz-Android-App")
+            .header("Cache-Control", "no-cache")
+            .header("Pragma", "no-cache")
             .build()
 
         client.newCall(request).execute().use { response ->

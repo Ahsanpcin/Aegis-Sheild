@@ -636,7 +636,7 @@ fun AdvancedPrecisionLabSection(
                 )
 
                 Text(
-                    text = "VirtualDisplay Width (applies on next Shield start): ${captureWidthPx}px",
+                    text = "VirtualDisplay Width (live resized): ${captureWidthPx}px",
                     color = AegisTextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -647,7 +647,7 @@ fun AdvancedPrecisionLabSection(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(320, 480, 640, 720).forEach { w ->
+                    listOf(256, 320, 480, 640).forEach { w ->
                         val selected = captureWidthPx == w
                         LabChip(
                             label = "${w}px",

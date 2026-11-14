@@ -39,6 +39,8 @@ class TFLiteContentClassifier(
     private var outputDataType: DataType = DataType.FLOAT32
     private var outputScale: Float = 1.0f
     private var outputZeroPoint: Int = 0
+    private var reusableFloatOut: Array<FloatArray>? = null
+    private var reusableByteOut: Array<ByteArray>? = null
 
     var lastErrorMessage: String? = null
         private set
@@ -61,7 +63,8 @@ class TFLiteContentClassifier(
         try {
             val options = Interpreter.Options().apply {
                 setNumThreads(2)
-                setUseNNAPI(false) // Safe CPU execution on Android 7.0
+                setUseNNAPI(false) // Safe CPU execution across Android 7.0+
+                setUseXNNPACK(true) // Vectorized SIMD CPU acceleration for lower latency & energy
             }
 
             val importedFile = modelManager?.activeModelFile
@@ -149,7 +152,8 @@ class TFLiteContentClassifier(
         tensorBuffer.rewind()
 
         val probabilities: FloatArray = if (outputDataType == DataType.UINT8) {
-            val rawOut = Array(1) { ByteArray(outputClassCount) }
+            val rawOut = reusableByteOut?.takeIf { it[0].size == outputClassCount }
+                ?: Array(1) { ByteArray(outputClassCount) }.also { reusableByteOut = it }
             tflite.run(tensorBuffer, rawOut)
             FloatArray(outputClassCount) { idx ->
                 val unsignedVal = rawOut[0][idx].toInt() and 0xFF
@@ -157,7 +161,8 @@ class TFLiteContentClassifier(
                 ((unsignedVal - outputZeroPoint) * scale).coerceIn(0f, 1f)
             }
         } else {
-            val floatOut = Array(1) { FloatArray(outputClassCount) }
+            val floatOut = reusableFloatOut?.takeIf { it[0].size == outputClassCount }
+                ?: Array(1) { FloatArray(outputClassCount) }.also { reusableFloatOut = it }
             tflite.run(tensorBuffer, floatOut)
             val raw = floatOut[0]
             if (raw.any { it < -0.001f || it > 1.001f }) {

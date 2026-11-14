@@ -40,8 +40,10 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -431,24 +433,29 @@ fun LiveScannerTelemetryCard(
     preferences: AegisPreferences,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
+    val powerMode by preferences.powerMode.collectAsState()
+    val scanIntervalMs by preferences.scanIntervalMs.collectAsState()
+    val captureWidthPx by preferences.captureWidthPx.collectAsState()
+    val autoThrottleLowBattery by preferences.autoThrottleLowBattery.collectAsState()
+    val adaptiveCadenceEnabled by preferences.adaptiveCadenceEnabled.collectAsState()
 
-    val powerMode = preferences.powerMode.value
-    val scanIntervalMs = preferences.scanIntervalMs.value
-    val skipDuplicates = preferences.skipDuplicateFrames.value
+    val displayIntervalMs = if (telemetry.isProtectionEnabled) telemetry.effectiveIntervalMs else scanIntervalMs
+    val ecoSavedPct = telemetry.ecoSavedPercent()
+    val isThrottled = telemetry.isLowBatteryThrottled || (autoThrottleLowBattery && !telemetry.isCharging && telemetry.isPowerSaveModeActive)
+
+    val badgeColor = when {
+        isThrottled -> AegisChampagneGold
+        adaptiveCadenceEnabled || powerMode.adaptiveBackoff -> AegisPrimaryCyan
+        else -> AegisPurple
+    }
+    val modeBadgeLabel = when {
+        isThrottled -> "Auto-Throttle <20% • ${displayIntervalMs}ms"
+        else -> "${powerMode.displayName} • ${displayIntervalMs}ms"
+    }
 
     CyberCard(
-        borderColor = AegisCardBorder,
-        tone = CyberCardTone.SKY,
+        borderColor = if (isThrottled) AegisGoldBorder else AegisCardBorder,
+        tone = if (isThrottled) CyberCardTone.GOLD else CyberCardTone.SKY,
         modifier = modifier.testTag("live_scanner_telemetry_card")
     ) {
         Row(
@@ -475,7 +482,7 @@ fun LiveScannerTelemetryCard(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (telemetry.isMediaProjectionActive) "SCANNER LIVE" else "SCANNER STANDBY",
+                    text = if (telemetry.isMediaProjectionActive) "ECO SCANNER LIVE" else "ECO SCANNER STANDBY",
                     color = AegisTextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -486,14 +493,14 @@ fun LiveScannerTelemetryCard(
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(AegisPrimaryCyan.copy(alpha = 0.12f))
-                    .border(1.dp, AegisPrimaryCyan.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(badgeColor.copy(alpha = 0.14f))
+                    .border(1.dp, badgeColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "${powerMode.displayName} • ${scanIntervalMs}ms",
-                    color = AegisPrimaryCyan,
+                    text = modeBadgeLabel,
+                    color = badgeColor,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = ClassicalBodyFont
@@ -515,19 +522,81 @@ fun LiveScannerTelemetryCard(
                 modifier = Modifier.weight(1f)
             )
             TelemetryMetricBox(
-                label = "PROCESSED FRAMES",
+                label = "FRAMES SCANNED",
                 value = "${telemetry.framesProcessedCount}",
                 icon = Icons.Default.Bolt,
                 accentColor = AegisPurple,
                 modifier = Modifier.weight(1f)
             )
             TelemetryMetricBox(
-                label = "BATTERY SAVER",
-                value = if (skipDuplicates) "ACTIVE" else "OFF",
+                label = "ECO SKIPPED",
+                value = "${telemetry.framesSkippedCount}",
                 icon = Icons.Default.BatterySaver,
                 accentColor = AegisChampagneGold,
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(AegisSurfaceElevated)
+                .border(1.dp, AegisCardBorder.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Battery Saver Efficiency (${ecoSavedPct}% AI work skipped)",
+                    color = AegisTextPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = ClassicalBodyFont
+                )
+                Text(
+                    text = "${telemetry.batteryPercent}%${if (telemetry.isCharging) " ⚡" else ""}",
+                    color = if (telemetry.batteryPercent <= 19 && !telemetry.isCharging) AegisWarningAmber else AegisPrimaryCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = ClassicalDisplayFont
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { (ecoSavedPct / 100f).coerceIn(0.05f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = if (isThrottled) AegisChampagneGold else AegisPrimaryCyan,
+                trackColor = AegisCardBorder.copy(alpha = 0.35f),
+                strokeCap = StrokeCap.Round
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Capture: ${captureWidthPx}px • Cores: Efficiency",
+                    color = AegisTextMuted,
+                    fontSize = 10.sp,
+                    fontFamily = ClassicalBodyFont
+                )
+                Text(
+                    text = if (autoThrottleLowBattery) "<20% Auto-Throttle ON" else "Auto-Throttle OFF",
+                    color = if (autoThrottleLowBattery) AegisPurple else AegisTextMuted,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = ClassicalBodyFont
+                )
+            }
         }
     }
 }

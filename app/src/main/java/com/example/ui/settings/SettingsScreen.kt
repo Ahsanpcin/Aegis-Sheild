@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
@@ -132,6 +133,8 @@ fun SettingsScreen(
     val skipDuplicateFrames by preferences.skipDuplicateFrames.collectAsState()
     val captureWidthPx by preferences.captureWidthPx.collectAsState()
     val pauseWhenScreenOff by preferences.pauseWhenScreenOff.collectAsState()
+    val adaptiveCadenceEnabled by preferences.adaptiveCadenceEnabled.collectAsState()
+    val autoThrottleLowBattery by preferences.autoThrottleLowBattery.collectAsState()
 
     val stage1DurationLabel = AegisPreferences.formatMinutesLabel(lockdownDurationMinutes)
     val doubleDurationLabel = AegisPreferences.formatMinutesLabel(
@@ -182,30 +185,48 @@ fun SettingsScreen(
                     )
                 }
 
-                // 2. Power & Performance Mode Widget + Power-Saving Options
+                // 2. Battery Saver & Smart Eco Mode Widget
                 item {
-                    LuxurySectionHeader(title = "Power & Performance Mode", accentColor = AegisPrimaryCyan)
+                    LuxurySectionHeader(title = "Battery Saver & Power Mode", accentColor = AegisPrimaryCyan)
                     Spacer(modifier = Modifier.height(8.dp))
                     CyberCard(
-                        borderColor = AegisCardBorder,
-                        tone = CyberCardTone.SKY,
+                        borderColor = if (telemetry.isLowBatteryThrottled) AegisGoldBorder else AegisCardBorder,
+                        tone = if (telemetry.isLowBatteryThrottled) CyberCardTone.GOLD else CyberCardTone.SKY,
                         modifier = Modifier.testTag("power_mode_widget")
                     ) {
-                        Text(
-                            text = "Shield Mode",
-                            color = AegisTextPrimary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = ClassicalDisplayFont
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = powerMode.caption,
-                            color = AegisPrimaryCyan,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = ClassicalBodyFont
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text(
+                                    text = "Shield Battery Mode",
+                                    color = AegisTextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = ClassicalDisplayFont
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = powerMode.caption,
+                                    color = AegisPrimaryCyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = ClassicalBodyFont
+                                )
+                            }
+                            StatusPill(
+                                label = when {
+                                    telemetry.isLowBatteryThrottled -> "<20% THROTTLED"
+                                    telemetry.isCharging -> "CHARGING ${telemetry.batteryPercent}%"
+                                    else -> "BATT ${telemetry.batteryPercent}%"
+                                },
+                                isActive = !telemetry.isLowBatteryThrottled,
+                                activeColor = AegisPrimaryCyan,
+                                inactiveColor = AegisChampagneGold
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -214,15 +235,31 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             PowerModeTile(
+                                mode = PowerMode.ADAPTIVE_ECO,
+                                icon = Icons.Default.AutoAwesome,
+                                accentColor = AegisPrimaryCyan,
+                                selected = powerMode == PowerMode.ADAPTIVE_ECO,
+                                onClick = { preferences.setPowerMode(PowerMode.ADAPTIVE_ECO) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("power_mode_adaptive_eco")
+                            )
+                            PowerModeTile(
                                 mode = PowerMode.POWER_SAVING,
                                 icon = Icons.Default.BatterySaver,
-                                accentColor = AegisPrimaryCyan,
+                                accentColor = AegisPurple,
                                 selected = powerMode == PowerMode.POWER_SAVING,
                                 onClick = { preferences.setPowerMode(PowerMode.POWER_SAVING) },
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("power_mode_power_saving")
                             )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             PowerModeTile(
                                 mode = PowerMode.BALANCED,
                                 icon = Icons.Default.Tune,
@@ -251,7 +288,7 @@ fun SettingsScreen(
                         )
 
                         Text(
-                            text = "Power-Saving Options",
+                            text = "Battery-Saving Controls",
                             color = AegisTextPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
@@ -260,16 +297,32 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         PowerOptionSwitchRow(
-                            title = "Skip Static Frames",
-                            subtitle = "Save battery on unchanged screens",
+                            title = "Auto-Throttle Below 20% Battery",
+                            subtitle = "Automatically slow scans when battery is low & unplugged",
+                            checked = autoThrottleLowBattery,
+                            onCheckedChange = { preferences.setAutoThrottleLowBattery(it) },
+                            testTag = "power_opt_low_battery_throttle"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PowerOptionSwitchRow(
+                            title = "Smart Adaptive Idle Backoff",
+                            subtitle = "Fast on app/screen changes, slower on idle reading",
+                            checked = adaptiveCadenceEnabled,
+                            onCheckedChange = { preferences.setAdaptiveCadenceEnabled(it) },
+                            testTag = "power_opt_adaptive_cadence"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PowerOptionSwitchRow(
+                            title = "Perceptual Static Frame Skip",
+                            subtitle = "Skip near-identical frames & background noise",
                             checked = skipDuplicateFrames,
                             onCheckedChange = { preferences.setSkipDuplicateFrames(it) },
                             testTag = "power_opt_skip_duplicates"
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         PowerOptionSwitchRow(
-                            title = "Compact Capture (320px)",
-                            subtitle = "Lower resolution saves GPU & RAM",
+                            title = "Compact Capture (256px)",
+                            subtitle = "Matches AI tensor size to slash GPU & RAM energy",
                             checked = captureWidthPx <= 320,
                             onCheckedChange = { preferences.setCompactPowerResolution(it) },
                             testTag = "power_opt_compact_capture"
@@ -277,7 +330,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         PowerOptionSwitchRow(
                             title = "Pause While Screen Off",
-                            subtitle = "Sleep frame scanner when locked",
+                            subtitle = "Zero-CPU sleep while display is locked",
                             checked = pauseWhenScreenOff,
                             onCheckedChange = { preferences.setPauseWhenScreenOff(it) },
                             testTag = "power_opt_pause_screen_off"

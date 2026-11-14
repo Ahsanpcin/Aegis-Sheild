@@ -5,8 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -15,11 +17,13 @@ import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.Process
 import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
@@ -28,8 +32,8 @@ import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.core.models.SecurityIncident
-import com.example.core.models.ThreatCategory
-import com.example.core.models.ThreatSeverity
+import com.example.data.preferences.AegisPreferences
+import com.example.data.repository.ProtectionRepository
 import com.example.detection.classifier.ClassificationResult
 import com.example.detection.classifier.TFLiteContentClassifier
 import com.example.detection.decision.DecisionOutcome
@@ -62,16 +66,78 @@ class AegisProtectionService : Service() {
     private lateinit var decisionEngine: ThreatDecisionEngine
 
     private var lastInspectionTimeMs: Long = 0L
+    private var lastTelemetryEmitMs: Long = 0L
 
     private var frameCounter: Long = 0L
+    private var skippedCounter: Long = 0L
     private var fpsCounter: Int = 0
     private var lastFpsSampleTime: Long = 0L
+    private var consecutiveIdleOrSafeTicks: Int = 0
+    private var seenContextChangeUptimeMs: Long = 0L
+    private var lastPublishedEffectiveIntervalMs: Int = 350
+
+    @Volatile
     private var isStopped = false
+
+    @Volatile
+    private var isScreenInteractive: Boolean = true
+
+    @Volatile
+    private var batteryPercent: Int = 100
+
+    @Volatile
+    private var isCharging: Boolean = false
+
+    @Volatile
+    private var isPowerSaveMode: Boolean = false
+
+    @Volatile
+    private var isLowBatteryThrottled: Boolean = false
+
+    private var isPowerReceiverRegistered = false
     private val powerManager by lazy { getSystemService(Context.POWER_SERVICE) as? PowerManager }
+
+    private val powerAndScreenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    isScreenInteractive = false
+                    if (container.preferences.pauseWhenScreenOff.value) {
+                        container.protectionRepository.recordInspectionMetrics(
+                            frameCount = frameCounter,
+                            fps = 0.0f,
+                            skippedCount = skippedCounter,
+                            effectiveIntervalMs = lastPublishedEffectiveIntervalMs
+                        )
+                    }
+                }
+                Intent.ACTION_SCREEN_ON -> {
+                    isScreenInteractive = true
+                    consecutiveIdleOrSafeTicks = 0
+                    lastInspectionTimeMs = 0L
+                }
+                Intent.ACTION_BATTERY_CHANGED -> {
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+                    if (level >= 0) {
+                        batteryPercent = ((level * 100) / scale).coerceIn(0, 100)
+                    }
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL
+                    syncPowerStateToRepo()
+                }
+                PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
+                    isPowerSaveMode = powerManager?.isPowerSaveMode == true
+                    syncPowerStateToRepo()
+                }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "AegisProtectionService created.")
+        Log.i(TAG, "AegisProtectionService created (Eco Engine active).")
         createNotificationChannel()
 
         contentClassifier = TFLiteContentClassifier(this, container.modelManager)
@@ -82,9 +148,20 @@ class AegisProtectionService : Service() {
         )
         decisionEngine = ThreatDecisionEngine()
 
-        val thread = HandlerThread("AegisFrameProcessor").apply { start() }
+        // Run frame scanning at background efficiency priority to favor LITTLE CPU cores
+        val thread = HandlerThread("AegisFrameProcessor", Process.THREAD_PRIORITY_BACKGROUND).apply {
+            start()
+        }
         backgroundThread = thread
         backgroundHandler = Handler(thread.looper)
+
+        isScreenInteractive = powerManager?.isInteractive != false
+        isPowerSaveMode = powerManager?.isPowerSaveMode == true
+        val (pct, charging) = ProtectionRepository.readBatterySnapshot(this)
+        batteryPercent = pct
+        isCharging = charging
+        registerPowerReceiver()
+        syncPowerStateToRepo()
 
         container.refreshModelTelemetry()
         container.protectionRepository.setServiceRunning(true)
@@ -102,6 +179,7 @@ class AegisProtectionService : Service() {
                         )
                     }
                     decisionEngine.reset()
+                    consecutiveIdleOrSafeTicks = 0
                     container.refreshModelTelemetry()
                     val statusLabel = if (reloaded) {
                         "Sheildlenz Active • AI Guardian Armed"
@@ -114,6 +192,52 @@ class AegisProtectionService : Service() {
                 }
             }
         }
+
+        // Dynamically resize VirtualDisplay when user toggles compact capture width in Edits
+        serviceScope.launch {
+            container.preferences.captureWidthPx.drop(1).collect { newWidth ->
+                backgroundHandler?.post {
+                    if (!isStopped && mediaProjection != null) {
+                        resizeVirtualDisplayCapture(newWidth.coerceIn(224, 1080))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun registerPowerReceiver() {
+        if (isPowerReceiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+        }
+        registerReceiver(powerAndScreenReceiver, filter)
+        isPowerReceiverRegistered = true
+    }
+
+    private fun syncPowerStateToRepo() {
+        val prefs = container.preferences
+        val (effectiveMs, lowBatt) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = prefs.scanIntervalMs.value,
+            adaptiveEnabled = prefs.adaptiveCadenceEnabled.value,
+            consecutiveIdleOrSafeCount = consecutiveIdleOrSafeTicks,
+            autoThrottleLowBattery = prefs.autoThrottleLowBattery.value,
+            batteryPercent = batteryPercent,
+            isCharging = isCharging,
+            isPowerSaveMode = isPowerSaveMode,
+            wasLowBatteryThrottled = isLowBatteryThrottled
+        )
+        isLowBatteryThrottled = lowBatt
+        lastPublishedEffectiveIntervalMs = effectiveMs
+        container.protectionRepository.updateBatteryPowerState(
+            batteryPercent = batteryPercent,
+            isCharging = isCharging,
+            isPowerSaveMode = isPowerSaveMode,
+            isLowBatteryThrottled = lowBatt,
+            effectiveIntervalMs = effectiveMs
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -157,6 +281,32 @@ class AegisProtectionService : Service() {
         return START_STICKY
     }
 
+    private fun computeCaptureDimensions(targetWidthPx: Int): Triple<Int, Int, Int> {
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+
+        val screenWidth = metrics.widthPixels.coerceAtLeast(1)
+        val screenHeight = metrics.heightPixels.coerceAtLeast(1)
+        val captureWidth = targetWidthPx.coerceIn(224, 1080)
+        val scale = captureWidth.toFloat() / screenWidth
+        val captureHeight = (screenHeight * scale).toInt().coerceAtLeast(224)
+        return Triple(captureWidth, captureHeight, metrics.densityDpi)
+    }
+
+    private fun attachImageReaderListener(reader: ImageReader) {
+        reader.setOnImageAvailableListener({ ir ->
+            val image = try {
+                ir.acquireLatestImage()
+            } catch (_: Exception) {
+                null
+            } ?: return@setOnImageAvailableListener
+
+            handleIncomingImage(image)
+        }, backgroundHandler)
+    }
+
     private fun startScreenCapture(resultCode: Int, resultData: Intent) {
         val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
             ?: return
@@ -176,44 +326,12 @@ class AegisProtectionService : Service() {
             }
         }, backgroundHandler)
 
-        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val metrics = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        windowManager.defaultDisplay.getRealMetrics(metrics)
-
-        val screenWidth = metrics.widthPixels
-        val screenHeight = metrics.heightPixels
-        val targetWidth = container.preferences.captureWidthPx.value.coerceIn(240, 1080)
-        val scale = targetWidth.toFloat() / screenWidth.coerceAtLeast(1)
-        val captureWidth = targetWidth
-        val captureHeight = (screenHeight * scale).toInt().coerceAtLeast(240)
-        val densityDpi = metrics.densityDpi
+        val (captureWidth, captureHeight, densityDpi) =
+            computeCaptureDimensions(container.preferences.captureWidthPx.value)
 
         val reader = ImageReader.newInstance(captureWidth, captureHeight, PixelFormat.RGBA_8888, 2)
         imageReader = reader
-
-        reader.setOnImageAvailableListener({ ir ->
-            val image = try {
-                ir.acquireLatestImage()
-            } catch (_: Exception) {
-                null
-            } ?: return@setOnImageAvailableListener
-
-            if (container.preferences.pauseWhenScreenOff.value && powerManager?.isInteractive == false) {
-                image.close()
-                return@setOnImageAvailableListener
-            }
-
-            val currentTime = SystemClock.uptimeMillis()
-            val dynamicIntervalMs = container.preferences.scanIntervalMs.value.toLong().coerceIn(100L, 2000L)
-            if (currentTime - lastInspectionTimeMs < dynamicIntervalMs) {
-                image.close()
-                return@setOnImageAvailableListener
-            }
-            lastInspectionTimeMs = currentTime
-
-            processFrame(image)
-        }, backgroundHandler)
+        attachImageReaderListener(reader)
 
         virtualDisplay = projection.createVirtualDisplay(
             "AegisProtectionStream",
@@ -230,48 +348,122 @@ class AegisProtectionService : Service() {
         container.protectionRepository.updateMediaProjectionState(true)
     }
 
-    private fun processFrame(image: Image) {
+    private fun resizeVirtualDisplayCapture(newWidthPx: Int) {
+        val vd = virtualDisplay ?: return
+        val oldReader = imageReader
+        try {
+            val (captureWidth, captureHeight, densityDpi) = computeCaptureDimensions(newWidthPx)
+            if (oldReader != null && oldReader.width == captureWidth && oldReader.height == captureHeight) {
+                return
+            }
+            val newReader = ImageReader.newInstance(captureWidth, captureHeight, PixelFormat.RGBA_8888, 2)
+            attachImageReaderListener(newReader)
+            vd.resize(captureWidth, captureHeight, densityDpi)
+            vd.surface = newReader.surface
+            imageReader = newReader
+            try {
+                oldReader?.close()
+            } catch (_: Exception) {
+            }
+            Log.i(TAG, "Resized VirtualDisplay capture cleanly to ${captureWidth}x${captureHeight}")
+        } catch (e: Exception) {
+            Log.w(TAG, "VirtualDisplay resize skipped: ${e.message}")
+        }
+    }
+
+    private fun handleIncomingImage(image: Image) {
+        val prefs = container.preferences
+
+        // Stage 1: Zero-Copy Gate 1 — Screen-Off true sleep
+        if (prefs.pauseWhenScreenOff.value && (!isScreenInteractive || powerManager?.isInteractive == false)) {
+            image.close()
+            return
+        }
+
+        // Stage 1: Zero-Copy Gate 2 — Lockdown overlay active
+        if (prefs.isLockdownActive() && overlayController.isOverlayVisible) {
+            image.close()
+            return
+        }
+
+        // Stage 1: Zero-Copy Gate 3 — Wake cadence immediately when Accessibility sees app/window change
+        val latestContextChange = container.protectionRepository.lastContextChangeUptimeMs
+        if (latestContextChange != seenContextChangeUptimeMs) {
+            seenContextChangeUptimeMs = latestContextChange
+            consecutiveIdleOrSafeTicks = 0
+        }
+
+        // Compute adaptive + <20% low-battery throttled interval
+        val (effectiveIntervalMs, lowBatt) = AegisPreferences.computeEffectiveScanIntervalMs(
+            baseIntervalMs = prefs.scanIntervalMs.value,
+            adaptiveEnabled = prefs.adaptiveCadenceEnabled.value,
+            consecutiveIdleOrSafeCount = consecutiveIdleOrSafeTicks,
+            autoThrottleLowBattery = prefs.autoThrottleLowBattery.value,
+            batteryPercent = batteryPercent,
+            isCharging = isCharging,
+            isPowerSaveMode = isPowerSaveMode,
+            wasLowBatteryThrottled = isLowBatteryThrottled
+        )
+        if (lowBatt != isLowBatteryThrottled) {
+            isLowBatteryThrottled = lowBatt
+            container.protectionRepository.updateBatteryPowerState(
+                batteryPercent = batteryPercent,
+                isCharging = isCharging,
+                isPowerSaveMode = isPowerSaveMode,
+                isLowBatteryThrottled = lowBatt,
+                effectiveIntervalMs = effectiveIntervalMs
+            )
+        }
+        lastPublishedEffectiveIntervalMs = effectiveIntervalMs
+
+        val currentTime = SystemClock.uptimeMillis()
+        if (currentTime - lastInspectionTimeMs < effectiveIntervalMs.toLong()) {
+            image.close()
+            return
+        }
+        lastInspectionTimeMs = currentTime
+
+        // Stage 1: Zero-Copy Gate 4 — Skip pixel copy & AI completely if model isn't ready
+        if (!contentClassifier.isModelReady) {
+            image.close()
+            return
+        }
+
+        // Stage 1: Zero-Copy Gate 5 — Whitelisted apps or safe system/home screens skip BEFORE bitmap extraction
+        val activePkg = container.protectionRepository.telemetry.value.activeMonitoredPackage
+        if ((!activePkg.isNullOrBlank() && prefs.isPackageWhitelisted(activePkg)) ||
+            isZeroCostSkipPackage(activePkg, packageName)
+        ) {
+            image.close()
+            skippedCounter++
+            consecutiveIdleOrSafeTicks = (consecutiveIdleOrSafeTicks + 1).coerceAtMost(30)
+            emitThrottledTelemetry(currentTime, currentFpsOverride = 0.0f)
+            return
+        }
+
+        processFrame(image, currentTime)
+    }
+
+    private fun processFrame(image: Image, nowUptime: Long) {
         try {
             val bitmap = framePreprocessor.extractBitmapFromImage(image)
             image.close()
 
             if (bitmap == null) return
 
+            // Stage 2: Perceptual block-luma duplicate skip (avoids inference on static/near-static frames)
             if (container.preferences.skipDuplicateFrames.value && framePreprocessor.isFrameDuplicate(bitmap)) {
-                bitmap.recycle()
+                skippedCounter++
+                consecutiveIdleOrSafeTicks = (consecutiveIdleOrSafeTicks + 1).coerceAtMost(30)
+                emitThrottledTelemetry(nowUptime)
                 return
             }
 
+            // Visual change detected -> snap adaptive cadence back to responsive speed
+            consecutiveIdleOrSafeTicks = 0
             frameCounter++
             fpsCounter++
-            val now = SystemClock.uptimeMillis()
-            if (lastFpsSampleTime == 0L) {
-                lastFpsSampleTime = now
-            } else if (now - lastFpsSampleTime >= 1000L) {
-                val currentFps = (fpsCounter * 1000f) / (now - lastFpsSampleTime)
-                container.protectionRepository.recordInspectionMetrics(frameCounter, currentFps)
-                fpsCounter = 0
-                lastFpsSampleTime = now
-            }
-
-            // Pause inference while our lockdown overlay covers the screen; Shield stays alive for instant resume on unlock
-            if (container.preferences.isLockdownActive() && overlayController.isOverlayVisible) {
-                bitmap.recycle()
-                return
-            }
-
-            // Bypass if active application is whitelisted by user
-            val activePkg = container.protectionRepository.telemetry.value.activeMonitoredPackage
-            if (!activePkg.isNullOrBlank() && container.preferences.isPackageWhitelisted(activePkg)) {
-                bitmap.recycle()
-                return
-            }
-
-            // Do not attempt inference or fake results when no TFLite model is loaded
-            if (!contentClassifier.isModelReady) {
-                bitmap.recycle()
-                return
-            }
+            emitThrottledTelemetry(nowUptime)
 
             framePreprocessor.configure(
                 width = contentClassifier.inputWidth,
@@ -280,8 +472,6 @@ class AegisProtectionService : Service() {
             )
 
             val tensorBuffer = framePreprocessor.preprocessBitmapToTensorBuffer(bitmap)
-            bitmap.recycle()
-
             val classification = contentClassifier.classifyTensorBuffer(tensorBuffer)
             if (!classification.isModelLoaded) return
 
@@ -312,6 +502,26 @@ class AegisProtectionService : Service() {
         }
     }
 
+    private fun emitThrottledTelemetry(nowUptime: Long, currentFpsOverride: Float? = null) {
+        if (lastFpsSampleTime == 0L) {
+            lastFpsSampleTime = nowUptime
+        }
+        if (nowUptime - lastTelemetryEmitMs < 1000L) return
+
+        val elapsedMs = (nowUptime - lastFpsSampleTime).coerceAtLeast(1L)
+        val computedFps = currentFpsOverride ?: ((fpsCounter * 1000f) / elapsedMs)
+        fpsCounter = 0
+        lastFpsSampleTime = nowUptime
+        lastTelemetryEmitMs = nowUptime
+
+        container.protectionRepository.recordInspectionMetrics(
+            frameCount = frameCounter,
+            fps = computedFps,
+            skippedCount = skippedCounter,
+            effectiveIntervalMs = lastPublishedEffectiveIntervalMs
+        )
+    }
+
     private fun handleThreatDetected(classification: ClassificationResult, decision: DecisionOutcome) {
         val targetPkg = container.protectionRepository.telemetry.value.activeMonitoredPackage ?: "Active Application"
         val targetAppName = container.protectionRepository.activeAppLabel.value
@@ -324,7 +534,6 @@ class AegisProtectionService : Service() {
 
         Log.w(TAG, "THREAT CONFIRMED: ${decision.category.name} in $targetAppName ($targetPkg). Executing eviction & full-device lockdown.")
 
-        // 1. Close offending app from foreground/background and prevent Recents re-entry if enabled
         if (container.preferences.evictAppOnThreat.value) {
             AegisAccessibilityService.closeAndEvictPackage(this, targetPkg)
         } else {
@@ -332,7 +541,6 @@ class AegisProtectionService : Service() {
         }
         val suspended = AegisDeviceAdminReceiver.suspendPackageIfDeviceOwner(this, targetPkg)
 
-        // 2. Engage persistent full-device lockdown and tell everything that was detected
         container.preferences.engageFullDeviceLockdown(
             appName = targetAppName,
             packageName = targetPkg,
@@ -343,7 +551,7 @@ class AegisProtectionService : Service() {
         overlayController.showLockdownOverlay(container.preferences.lockdownIncidentInfo.value)
 
         val totalMinutes = container.preferences.lockdownDurationMinutes.value
-        val durationLabel = com.example.data.preferences.AegisPreferences.formatMinutesLabel(totalMinutes)
+        val durationLabel = AegisPreferences.formatMinutesLabel(totalMinutes)
         val actionSummary = buildString {
             append(if (container.preferences.evictAppOnThreat.value) "App Evicted & Background Killed" else "Screen Shielded")
             if (suspended) append(" + Package Suspended")
@@ -371,6 +579,15 @@ class AegisProtectionService : Service() {
         if (isStopped) return
         isStopped = true
         Log.i(TAG, "Cleaning up AegisProtectionService resources.")
+
+        if (isPowerReceiverRegistered) {
+            try {
+                unregisterReceiver(powerAndScreenReceiver)
+            } catch (_: Exception) {
+            }
+            isPowerReceiverRegistered = false
+        }
+
         try {
             virtualDisplay?.release()
         } catch (_: Exception) {
@@ -394,7 +611,7 @@ class AegisProtectionService : Service() {
         }
         contentClassifier.close()
         decisionEngine.reset()
-        framePreprocessor.reset()
+        framePreprocessor.recyclePools()
 
         container.protectionRepository.updateMediaProjectionState(false)
         container.protectionRepository.setServiceRunning(false)
@@ -464,6 +681,32 @@ class AegisProtectionService : Service() {
 
         const val EXTRA_RESULT_CODE = "extra_result_code"
         const val EXTRA_RESULT_DATA = "extra_result_data"
+
+        private val SAFE_SYSTEM_PACKAGES = setOf(
+            "com.android.systemui",
+            "com.android.dialer",
+            "com.google.android.dialer",
+            "com.android.phone",
+            "com.android.incallui",
+            "com.android.emergency",
+            "com.android.launcher",
+            "com.android.launcher3",
+            "com.google.android.apps.nexuslauncher",
+            "com.sec.android.app.launcher",
+            "com.miui.home",
+            "com.oneplus.launcher",
+            "com.oppo.launcher",
+            "com.android.calculator2",
+            "com.google.android.calculator",
+            "com.android.deskclock",
+            "com.google.android.deskclock"
+        )
+
+        internal fun isZeroCostSkipPackage(activePackage: String?, ownPackage: String): Boolean {
+            if (activePackage.isNullOrBlank()) return false
+            val pkg = activePackage.lowercase()
+            return pkg == ownPackage.lowercase() || pkg in SAFE_SYSTEM_PACKAGES
+        }
 
         fun start(context: Context, resultCode: Int, resultData: Intent) {
             val intent = Intent(context, AegisProtectionService::class.java).apply {

@@ -24,15 +24,26 @@ enum class PowerMode(
     val scanIntervalMs: Int,
     val captureWidthPx: Int,
     val skipDuplicates: Boolean,
-    val pauseOnScreenOff: Boolean
+    val pauseOnScreenOff: Boolean,
+    val adaptiveBackoff: Boolean
 ) {
+    ADAPTIVE_ECO(
+        displayName = "Adaptive Eco",
+        caption = "350ms–1600ms • Smart Battery",
+        scanIntervalMs = 350,
+        captureWidthPx = 256,
+        skipDuplicates = true,
+        pauseOnScreenOff = true,
+        adaptiveBackoff = true
+    ),
     POWER_SAVING(
         displayName = "Power Saving",
-        caption = "650ms • Low Battery",
-        scanIntervalMs = 650,
-        captureWidthPx = 320,
+        caption = "750ms • Ultra Low CPU",
+        scanIntervalMs = 750,
+        captureWidthPx = 256,
         skipDuplicates = true,
-        pauseOnScreenOff = true
+        pauseOnScreenOff = true,
+        adaptiveBackoff = true
     ),
     BALANCED(
         displayName = "Balanced",
@@ -40,7 +51,8 @@ enum class PowerMode(
         scanIntervalMs = 300,
         captureWidthPx = 480,
         skipDuplicates = true,
-        pauseOnScreenOff = true
+        pauseOnScreenOff = true,
+        adaptiveBackoff = false
     ),
     EXTREME(
         displayName = "Extreme",
@@ -48,7 +60,8 @@ enum class PowerMode(
         scanIntervalMs = 120,
         captureWidthPx = 640,
         skipDuplicates = false,
-        pauseOnScreenOff = false
+        pauseOnScreenOff = false,
+        adaptiveBackoff = false
     )
 }
 
@@ -124,10 +137,10 @@ class AegisPreferences(context: Context) {
     private val _powerMode = MutableStateFlow(getSavedPowerMode())
     val powerMode: StateFlow<PowerMode> = _powerMode.asStateFlow()
 
-    private val _scanIntervalMs = MutableStateFlow(prefs.getInt(KEY_SCAN_INTERVAL_MS, 300).coerceIn(100, 2000))
+    private val _scanIntervalMs = MutableStateFlow(prefs.getInt(KEY_SCAN_INTERVAL_MS, 350).coerceIn(100, 2000))
     val scanIntervalMs: StateFlow<Int> = _scanIntervalMs.asStateFlow()
 
-    private val _captureWidthPx = MutableStateFlow(prefs.getInt(KEY_CAPTURE_WIDTH_PX, 480).coerceIn(240, 1080))
+    private val _captureWidthPx = MutableStateFlow(prefs.getInt(KEY_CAPTURE_WIDTH_PX, 256).coerceIn(224, 1080))
     val captureWidthPx: StateFlow<Int> = _captureWidthPx.asStateFlow()
 
     private val _skipDuplicateFrames = MutableStateFlow(prefs.getBoolean(KEY_SKIP_DUPLICATE_FRAMES, true))
@@ -135,6 +148,12 @@ class AegisPreferences(context: Context) {
 
     private val _pauseWhenScreenOff = MutableStateFlow(prefs.getBoolean(KEY_PAUSE_WHEN_SCREEN_OFF, true))
     val pauseWhenScreenOff: StateFlow<Boolean> = _pauseWhenScreenOff.asStateFlow()
+
+    private val _adaptiveCadenceEnabled = MutableStateFlow(prefs.getBoolean(KEY_ADAPTIVE_CADENCE, true))
+    val adaptiveCadenceEnabled: StateFlow<Boolean> = _adaptiveCadenceEnabled.asStateFlow()
+
+    private val _autoThrottleLowBattery = MutableStateFlow(prefs.getBoolean(KEY_AUTO_THROTTLE_LOW_BATTERY, true))
+    val autoThrottleLowBattery: StateFlow<Boolean> = _autoThrottleLowBattery.asStateFlow()
 
     private val _whitelistedPackages = MutableStateFlow(
         prefs.getStringSet(KEY_WHITELISTED_PACKAGES, emptySet()) ?: emptySet()
@@ -256,11 +275,11 @@ class AegisPreferences(context: Context) {
     }
 
     private fun getSavedPowerMode(): PowerMode {
-        val name = prefs.getString(KEY_POWER_MODE, PowerMode.BALANCED.name)
+        val name = prefs.getString(KEY_POWER_MODE, PowerMode.ADAPTIVE_ECO.name)
         return try {
-            PowerMode.valueOf(name ?: PowerMode.BALANCED.name)
+            PowerMode.valueOf(name ?: PowerMode.ADAPTIVE_ECO.name)
         } catch (_: Exception) {
-            PowerMode.BALANCED
+            PowerMode.ADAPTIVE_ECO
         }
     }
 
@@ -358,12 +377,14 @@ class AegisPreferences(context: Context) {
             .putInt(KEY_CAPTURE_WIDTH_PX, mode.captureWidthPx)
             .putBoolean(KEY_SKIP_DUPLICATE_FRAMES, mode.skipDuplicates)
             .putBoolean(KEY_PAUSE_WHEN_SCREEN_OFF, mode.pauseOnScreenOff)
+            .putBoolean(KEY_ADAPTIVE_CADENCE, mode.adaptiveBackoff)
             .apply()
         _powerMode.value = mode
         _scanIntervalMs.value = mode.scanIntervalMs
         _captureWidthPx.value = mode.captureWidthPx
         _skipDuplicateFrames.value = mode.skipDuplicates
         _pauseWhenScreenOff.value = mode.pauseOnScreenOff
+        _adaptiveCadenceEnabled.value = mode.adaptiveBackoff
     }
 
     fun setScanIntervalMs(intervalMs: Int) {
@@ -373,7 +394,7 @@ class AegisPreferences(context: Context) {
     }
 
     fun setCaptureWidthPx(widthPx: Int) {
-        val clamped = widthPx.coerceIn(240, 1080)
+        val clamped = widthPx.coerceIn(224, 1080)
         prefs.edit().putInt(KEY_CAPTURE_WIDTH_PX, clamped).apply()
         _captureWidthPx.value = clamped
     }
@@ -389,8 +410,18 @@ class AegisPreferences(context: Context) {
     }
 
     fun setCompactPowerResolution(enabled: Boolean) {
-        val targetWidth = if (enabled) 320 else PowerMode.BALANCED.captureWidthPx
+        val targetWidth = if (enabled) 256 else PowerMode.BALANCED.captureWidthPx
         setCaptureWidthPx(targetWidth)
+    }
+
+    fun setAdaptiveCadenceEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ADAPTIVE_CADENCE, enabled).apply()
+        _adaptiveCadenceEnabled.value = enabled
+    }
+
+    fun setAutoThrottleLowBattery(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_THROTTLE_LOW_BATTERY, enabled).apply()
+        _autoThrottleLowBattery.value = enabled
     }
 
     fun setCustomThresholdsEnabled(enabled: Boolean) {
@@ -435,7 +466,8 @@ class AegisPreferences(context: Context) {
     fun resetAdvancedCustomizations() {
         setLockdownHours(DEFAULT_LOCKDOWN_HOURS)
         setDoubleTimeMultiplier(2.0f)
-        setPowerMode(PowerMode.BALANCED)
+        setPowerMode(PowerMode.ADAPTIVE_ECO)
+        setAutoThrottleLowBattery(true)
         setCustomThresholdsEnabled(false)
         setCustomExplicitThreshold(0.75f)
         setCustomSuggestiveThreshold(0.80f)
@@ -697,6 +729,54 @@ class AegisPreferences(context: Context) {
             return String.format(java.util.Locale.US, "%d:%02d %s", hour12, min, amPm)
         }
 
+        const val LOW_BATTERY_ENGAGE_PERCENT = 19
+        const val LOW_BATTERY_RELEASE_PERCENT = 22
+
+        /**
+         * Computes the effective scan interval (in ms) combining Smart Adaptive Eco backoff
+         * and <20% Low-Battery / Android Battery Saver auto-throttling.
+         * Returns Pair(effectiveIntervalMs, isLowBatteryThrottled).
+         */
+        fun computeEffectiveScanIntervalMs(
+            baseIntervalMs: Int,
+            adaptiveEnabled: Boolean,
+            consecutiveIdleOrSafeCount: Int,
+            autoThrottleLowBattery: Boolean,
+            batteryPercent: Int,
+            isCharging: Boolean,
+            isPowerSaveMode: Boolean,
+            wasLowBatteryThrottled: Boolean
+        ): Pair<Int, Boolean> {
+            val lowBattActive = when {
+                !autoThrottleLowBattery || isCharging -> false
+                batteryPercent <= LOW_BATTERY_ENGAGE_PERCENT -> true
+                batteryPercent >= LOW_BATTERY_RELEASE_PERCENT -> false
+                else -> wasLowBatteryThrottled
+            }
+
+            val throttleActive = lowBattActive || (autoThrottleLowBattery && !isCharging && isPowerSaveMode)
+
+            val adaptiveMs = if (!adaptiveEnabled) {
+                baseIntervalMs
+            } else {
+                val multiplier = when {
+                    consecutiveIdleOrSafeCount >= 14 -> 4.5f
+                    consecutiveIdleOrSafeCount >= 8 -> 3.0f
+                    consecutiveIdleOrSafeCount >= 4 -> 1.75f
+                    else -> 1.0f
+                }
+                (baseIntervalMs * multiplier).toInt().coerceAtMost(1800)
+            }
+
+            val finalMs = if (throttleActive) {
+                maxOf((adaptiveMs * 1.35f).toInt(), 1000).coerceIn(100, 2000)
+            } else {
+                adaptiveMs.coerceIn(100, 2000)
+            }
+
+            return finalMs to lowBattActive
+        }
+
         private const val KEY_SENSITIVITY = "key_sensitivity"
         private const val KEY_STRICT_EVERYTHING = "key_strict_everything"
         private const val KEY_AUTO_START = "key_auto_start"
@@ -727,6 +807,8 @@ class AegisPreferences(context: Context) {
         private const val KEY_CAPTURE_WIDTH_PX = "key_capture_width_px"
         private const val KEY_SKIP_DUPLICATE_FRAMES = "key_skip_duplicate_frames"
         private const val KEY_PAUSE_WHEN_SCREEN_OFF = "key_pause_when_screen_off"
+        private const val KEY_ADAPTIVE_CADENCE = "key_adaptive_cadence"
+        private const val KEY_AUTO_THROTTLE_LOW_BATTERY = "key_auto_throttle_low_battery"
         private const val KEY_CUSTOM_THRESHOLDS_ENABLED = "key_custom_thresholds_enabled"
         private const val KEY_CUSTOM_EXPLICIT_THRESHOLD = "key_custom_explicit_threshold"
         private const val KEY_CUSTOM_SUGGESTIVE_THRESHOLD = "key_custom_suggestive_threshold"
