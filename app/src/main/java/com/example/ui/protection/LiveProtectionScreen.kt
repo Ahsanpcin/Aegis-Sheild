@@ -58,7 +58,10 @@ import com.example.security.deviceowner.AegisDeviceAdminReceiver
 import com.example.ui.components.CyberCard
 import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
+import com.example.ui.components.LiveScannerTelemetryCard
 import com.example.ui.components.LuxurySectionHeader
+import com.example.ui.components.SecurityHealthGaugeCard
+import com.example.ui.components.SecurityHealthReport
 import com.example.ui.components.MetricTile
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.StatusPill
@@ -82,12 +85,14 @@ import com.example.ui.theme.ClassicalDisplayFont
 @Composable
 fun LiveProtectionScreen(
     protectionRepo: ProtectionRepository,
-    preferences: AegisPreferences
+    preferences: AegisPreferences,
+    onRequestArmShield: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val telemetry by protectionRepo.telemetry.collectAsState()
     val activeAppName by protectionRepo.activeAppLabel.collectAsState()
+    val hasGuardianPin by preferences.hasGuardianPin.collectAsState()
 
     var hasOverlay by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     var hasAccessibility by remember {
@@ -95,6 +100,26 @@ fun LiveProtectionScreen(
     }
     var hasBattery by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
     var isDeviceAdmin by remember { mutableStateOf(AegisDeviceAdminReceiver.isDeviceAdmin(context)) }
+
+    val healthReport = remember(
+        telemetry.isProtectionEnabled,
+        hasOverlay,
+        hasAccessibility,
+        isDeviceAdmin,
+        hasGuardianPin,
+        hasBattery,
+        telemetry.isModelLoaded
+    ) {
+        SecurityHealthReport.compute(
+            isShieldRunning = telemetry.isProtectionEnabled,
+            hasOverlay = hasOverlay,
+            hasAccessibility = hasAccessibility,
+            isDeviceAdmin = isDeviceAdmin,
+            hasGuardianPin = hasGuardianPin,
+            hasBatteryExemption = hasBattery,
+            isModelLoaded = telemetry.isModelLoaded
+        )
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -119,7 +144,7 @@ fun LiveProtectionScreen(
             topBar = {
                 CyberTopBar(
                     title = "Status",
-                    subtitle = "AI Classifications, Telemetry & Health"
+                    subtitle = "Security Health, Live Telemetry & AI"
                 )
             },
             containerColor = Color.Transparent
@@ -132,9 +157,30 @@ fun LiveProtectionScreen(
                 contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Top: AI Classifications Widget
+                // 1. Device Security Health Score
                 item {
-                    LuxurySectionHeader(title = "AI Classifications", accentColor = AegisPurple)
+                    LuxurySectionHeader(title = "Device Health Score", accentColor = AegisPurple)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SecurityHealthGaugeCard(
+                        report = healthReport,
+                        preferences = preferences,
+                        onRequestArmShield = onRequestArmShield
+                    )
+                }
+
+                // 2. Real-Time Scanner Telemetry & Battery Efficiency
+                item {
+                    LuxurySectionHeader(title = "Scanner Telemetry", accentColor = AegisPrimaryCyan)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LiveScannerTelemetryCard(
+                        telemetry = telemetry,
+                        preferences = preferences
+                    )
+                }
+
+                // 3. AI Classifications Pipeline
+                item {
+                    LuxurySectionHeader(title = "AI Classification Pipeline", accentColor = AegisPurple)
                     Spacer(modifier = Modifier.height(10.dp))
                     CyberCard(
                         borderColor = AegisLavenderBorder,

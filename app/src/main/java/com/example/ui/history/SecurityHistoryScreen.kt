@@ -62,9 +62,12 @@ import com.example.ui.components.CyberCardTone
 import com.example.ui.components.CyberTopBar
 import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.MetricTile
+import com.example.ui.components.PeakThreatWindowCard
 import com.example.ui.components.SeverityTag
+import com.example.ui.components.SevenDayThreatChart
 import com.example.ui.components.SheildlenzBackdrop
 import com.example.ui.components.ThreatCategoryBadge
+import com.example.ui.components.ThreatCategoryDistributionCard
 import com.example.ui.components.rememberMasterKeyGate
 import com.example.ui.theme.AegisCardBackground
 import com.example.ui.theme.AegisCardBorder
@@ -125,13 +128,17 @@ fun SecurityHistoryScreen(
             .sortedByDescending { it.count }
     }
 
+    val analytics = remember(incidents) {
+        SecurityHistoryRepository.computeAnalytics(incidents)
+    }
+
     SheildlenzBackdrop(modifier = Modifier.testTag("security_history_screen_root")) {
         Scaffold(
             contentWindowInsets = WindowInsets.statusBars,
             topBar = {
                 CyberTopBar(
                     title = "Progress",
-                    subtitle = "Protection Ledger & History",
+                    subtitle = "Threat Analytics & Protection Ledger",
                     actions = {
                         if (incidents.isNotEmpty()) {
                             IconButton(
@@ -162,9 +169,26 @@ fun SecurityHistoryScreen(
                 contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // 1. Top: Protection Ledger & Which Apps Blocked Widget
+                // 1. 7-Day Threat Trend Chart
                 item {
-                    LuxurySectionHeader(title = "Protection Ledger")
+                    LuxurySectionHeader(title = "Threat Analytics", accentColor = AegisPurple)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SevenDayThreatChart(weeklyTrend = analytics.weeklyTrend)
+                }
+
+                // 2. Threat Category Distribution
+                item {
+                    ThreatCategoryDistributionCard(analytics = analytics)
+                }
+
+                // 3. Peak Threat Window & Top Blocked App
+                item {
+                    PeakThreatWindowCard(analytics = analytics)
+                }
+
+                // 4. Protection Ledger Metrics
+                item {
+                    LuxurySectionHeader(title = "Protection Ledger", accentColor = AegisChampagneGold)
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

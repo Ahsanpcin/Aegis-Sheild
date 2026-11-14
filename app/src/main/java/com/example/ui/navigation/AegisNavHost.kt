@@ -339,7 +339,8 @@ fun AegisNavHost(
                         } else {
                             LiveProtectionScreen(
                                 protectionRepo = container.protectionRepository,
-                                preferences = container.preferences
+                                preferences = container.preferences,
+                                onRequestArmShield = onRequestStartProtection
                             )
                         }
                     }

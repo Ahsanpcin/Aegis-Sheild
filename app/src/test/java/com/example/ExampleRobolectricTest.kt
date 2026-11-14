@@ -12,6 +12,7 @@ import com.example.core.models.SecurityIncident
 import com.example.core.models.SensitivityLevel
 import com.example.core.models.ThreatCategory
 import com.example.core.models.ThreatSeverity
+import com.example.ui.components.SecurityHealthReport
 import com.example.data.local.AegisDatabase
 import com.example.data.preferences.AegisPreferences
 import com.example.data.preferences.PowerMode
@@ -753,5 +754,84 @@ class ExampleRobolectricTest {
 
         prefs.setWhitelistedPackages(emptySet())
         assertFalse(prefs.isPackageWhitelisted("com.google.android.youtube"))
+    }
+
+    @Test
+    fun `security health score computes correct scores and status descriptions`() {
+        // 1. All layers active = 100% Immune
+        val immuneReport = SecurityHealthReport.compute(
+            isShieldRunning = true,
+            hasOverlay = true,
+            hasAccessibility = true,
+            isDeviceAdmin = true,
+            hasGuardianPin = true,
+            hasBatteryExemption = true,
+            isModelLoaded = true
+        )
+        assertEquals(100, immuneReport.score)
+        assertTrue(immuneReport.statusTitle.contains("Immune"))
+
+        // 2. Core shield & accessibility only = 55%
+        val partialReport = SecurityHealthReport.compute(
+            isShieldRunning = true,
+            hasOverlay = true,
+            hasAccessibility = true,
+            isDeviceAdmin = false,
+            hasGuardianPin = false,
+            hasBatteryExemption = false,
+            isModelLoaded = false
+        )
+        assertEquals(55, partialReport.score)
+        assertTrue(partialReport.statusTitle.contains("Partially"))
+
+        // 3. Everything off = 0%
+        val vulnerableReport = SecurityHealthReport.compute(
+            isShieldRunning = false,
+            hasOverlay = false,
+            hasAccessibility = false,
+            isDeviceAdmin = false,
+            hasGuardianPin = false,
+            hasBatteryExemption = false,
+            isModelLoaded = false
+        )
+        assertEquals(0, vulnerableReport.score)
+        assertTrue(vulnerableReport.statusTitle.contains("Vulnerable"))
+    }
+
+    @Test
+    fun `threat analytics calculates weekly trend, peak window, and category distribution`() {
+        val now = System.currentTimeMillis()
+        val incidents = listOf(
+            SecurityIncident(
+                id = 1L,
+                timestampMillis = now,
+                packageName = "com.sample.browser",
+                appDisplayName = "Sample Browser",
+                category = ThreatCategory.EXPLICIT_ADULT,
+                severity = ThreatSeverity.CRITICAL,
+                confidenceScore = 0.95f,
+                actionTaken = "Block"
+            ),
+            SecurityIncident(
+                id = 2L,
+                timestampMillis = now,
+                packageName = "com.sample.browser",
+                appDisplayName = "Sample Browser",
+                category = ThreatCategory.SUGGESTIVE_CONTENT,
+                severity = ThreatSeverity.HIGH,
+                confidenceScore = 0.85f,
+                actionTaken = "Block"
+            )
+        )
+
+        val analytics = SecurityHistoryRepository.computeAnalytics(incidents)
+        assertEquals(2, analytics.totalDetections)
+        assertEquals(1, analytics.explicitAdultCount)
+        assertEquals(1, analytics.suggestiveCount)
+        assertEquals(7, analytics.weeklyTrend.size)
+        assertEquals(2, analytics.weeklyTrend.last().count)
+        assertTrue(analytics.weeklyTrend.last().isToday)
+        assertEquals("Sample Browser", analytics.peakAppDisplayName)
+        assertNotNull(analytics.peakHourWindow)
     }
 }
